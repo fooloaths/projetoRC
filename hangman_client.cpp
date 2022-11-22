@@ -25,7 +25,4 @@ int main(int argc, char *argv[])
     // get the server's IP address and port number
     char *server_ip = argv[1];
     int server_port = atoi(argv[2]);
-
-    // print the server's IP address and port number
-    printf("Server IP: %s, Server Port: %d\n", server_ip, server_port);
 }
