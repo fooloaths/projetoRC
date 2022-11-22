@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
     // check if the number of arguments is correct
     if (argc != 3)
     {
-        printf("Usage: %s <Server IP> <Server Port>\n", argv[0]);
+        printf("Error, try running it like this: %s <server IP> <server port>\n", argv[0]);
         exit(1);
     }
 
