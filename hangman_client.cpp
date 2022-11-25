@@ -22,6 +22,9 @@ Mateus Pinho - ist199282
 #include <string>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 
 // TODO don't add \n from hint to file
 
