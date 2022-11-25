@@ -26,6 +26,8 @@ Mateus Pinho - ist199282
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <cstring>
+#include <tuple>
+#include <unistd.h>
 
 // TODO don't add \n from hint to file
 
@@ -71,7 +73,8 @@ int main(int argc, char *argv[]) {
     errorcode = getaddrinfo(server_ip, server_port, &hints, &res);
     if (errorcode != 0) exit(1); 
 
-    printf("Welcome to Hangman!\n\n");
+    /* main program code */
+    printf("Welcome to Hangman!\n");
 
     freeaddrinfo(res);
     close(fd);
