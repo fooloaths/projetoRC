@@ -37,7 +37,7 @@ Mateus Pinho - ist199282
 /* Global variables */
 int move_number = 1;
 
-int start_new_game(std::string id);
+int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 int valid_id(std::string id);
 int receive_message(int fd, socklen_t addrlen, sockaddr_in addr, char buffer[]);
 int send_message(int fd, char message[], size_t buf_size, struct addrinfo res);
@@ -86,17 +86,17 @@ int main(int argc, char *argv[]) {
 
     // check if the command is equal to "start"
     if (command == "start") {
-        start_new_game(message);
+        start_new_game(message, fd, res, addr);
     }
 
     freeaddrinfo(res);
     close(fd);
 }
 
-int receive_message(int fd, socklen_t addrlen, struct sockaddr_in addr, char buffer[]) {
-    addrlen = sizeof(addr);
+int receive_message(int fd, struct sockaddr_in addr, char buffer[]) {
+    socklen_t addrlen = sizeof(addr);
     ssize_t n = recvfrom(fd, buffer, BLOCK_SIZE, 0, (struct sockaddr*)&addr, &addrlen);
-    
+
     if(n==-1) { 
         /* Error */
         printf("Error (receive_message): An error occured while receiving a message.\n");
@@ -120,19 +120,20 @@ int send_message(int fd, char message[], size_t buf_size, struct addrinfo *res) 
     return 0;
 }
 
-int start_new_game(std::string id) {
+int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
 
     if (!valid_id(id)) {
         // TODO send error message
         return -1;
     }
-
-    // Connect to server
-
     // Send ID and new game request
-
+    char message[BLOCK_SIZE];
+    sprintf(message, "SNG %s", id.c_str());
+    send_message(fd, message, BLOCK_SIZE, res);
     // Receive message
-
+    char buffer[BLOCK_SIZE];
+    receive_message(fd, addr, buffer);
+    printf(buffer);
     // Set word size
 
     // Set maximum number of errors
