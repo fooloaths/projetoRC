@@ -76,17 +76,17 @@ int main(int argc, char *argv[]) {
 
     /* main program code */
     // wait for the user to input an ID
-    std::string command;
-    std::cin >> command;
+    std::string input;
+    std::cin >> input;
     
     // split command in two strings using space as delimiter
     // TODO change this
     std::string command = command.substr(0, command.find(" "));
-    std::string input = command.substr(command.find(" ") + 1);
+    std::string message = command.substr(command.find(" ") + 1);
 
     // check if the command is equal to "start"
     if (command == "start") {
-        start_new_game(input);
+        start_new_game(message);
     }
 
     freeaddrinfo(res);
