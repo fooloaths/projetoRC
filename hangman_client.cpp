@@ -39,7 +39,7 @@ int move_number = 1;
 
 int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 int valid_id(std::string id);
-int receive_message(int fd, socklen_t addrlen, sockaddr_in addr, char buffer[]);
+int receive_message(int fd, socklen_t addrlen, sockaddr_in addr, char* buffer, size_t buf_size);
 int send_message(int fd, char message[], size_t buf_size, struct addrinfo res);
 
 int main(int argc, char *argv[]) {
@@ -93,9 +93,9 @@ int main(int argc, char *argv[]) {
     close(fd);
 }
 
-int receive_message(int fd, struct sockaddr_in addr, char buffer[]) {
+int receive_message(int fd, struct sockaddr_in addr, char* buffer, size_t buf_size) {
     socklen_t addrlen = sizeof(addr);
-    ssize_t n = recvfrom(fd, buffer, BLOCK_SIZE, 0, (struct sockaddr*)&addr, &addrlen);
+    ssize_t n = recvfrom(fd, buffer, buf_size, 0, (struct sockaddr*)&addr, &addrlen);
 
     if(n==-1) { 
         /* Error */
@@ -107,7 +107,7 @@ int receive_message(int fd, struct sockaddr_in addr, char buffer[]) {
     return 0;
 }
 
-int send_message(int fd, char message[], size_t buf_size, struct addrinfo *res) {
+int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res) {
     ssize_t n = sendto(fd, message, buf_size, 0, res->ai_addr, res->ai_addrlen);
 
     if(n == -1) {
@@ -126,20 +126,46 @@ int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr
         // TODO send error message
         return -1;
     }
+
     // Send ID and new game request
-    char message[BLOCK_SIZE];
-    sprintf(message, "SNG %s\n", id.c_str());
-    send_message(fd, message, BLOCK_SIZE, res);
-    printf("Sent message: %s", message);
-    // Receive message
+    std::string message = "SNG " + id + "\n";
+    send_message(fd, message.c_str(), message.length(), res);
+
+    // TODO Receive messageww
+    // ! fix the buffer being block size
     char buffer[BLOCK_SIZE];
-    receive_message(fd, addr, buffer);
-    printf("Server response, %s", buffer);
+    receive_message(fd, addr, buffer, BLOCK_SIZE);
+    std::string response = buffer;
 
-    // Set word size
+    // split input in four strings using space as delimiter, doesnt account for malformed input
+    // remove \n from response
+    response.pop_back();
 
-    // Set maximum number of errors
+    std::string response_command = response.substr(0 , response.find(' '));
+    if (response_command == "ERR") {
+        // TODO send error message
+        return -1;
+    }
+    
+    std::string status = response.substr(response.find(' ') + 1, response.find(' ', response.find(' ') + 1));
+    std::string n_letters = response.substr(response.find(' ', response.find(' ') + 1) + 1, response.find(' ', response.find(' ', response.find(' ') + 1) + 1));
+    std::string max_errors = response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length());
 
+    // convert number of letters into a number of underscores to print
+    int n_letters_int = std::stoi(n_letters);
+    std::string underscores = "";
+    for (int i = 0; i < n_letters_int; i++) {
+        underscores += "_ ";
+    }
+
+    // ! code down sucks
+    // // if (status != "OK") {
+    // //     // TODO send error message
+    // //     return -1;
+    // // }
+
+    printf("New game started (max %s errors): %s\n", max_errors.c_str(), underscores.c_str());
+    
     return 0; // 0 is a placeholder
 }
 
