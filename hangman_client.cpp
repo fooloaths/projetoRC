@@ -18,6 +18,10 @@ Mateus Pinho - ist199282
 #include "hangman_client.hpp"
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <string>
+#include <stdlib.h>
+#include <sys/socket.h>
 
 // TODO don't add \n from hint to file
 
@@ -27,11 +31,18 @@ Mateus Pinho - ist199282
 /* Global variables */
 int move_number = 1;
 
-int start_new_game(string id);
-int valid_id(string id);
+int start_new_game(std::string id);
+int valid_id(std::string id);
+int receive_message();
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
+    int fd, errorcode;
+    ssize_t n;
+    socklen_t addrlen;
+    struct addrinfo hints, *res;
+    struct sockaddr_in addr;
+    char buffer[BLOCK_SIZE];
+
     // check if the number of arguments is correct
     if (argc != 3)
     {
@@ -43,15 +54,43 @@ int main(int argc, char *argv[])
     // get the server's IP address and port number
     char *server_ip = argv[1];
     int server_port = atoi(argv[2]);
+
+    // create a socket
+
 }
 
-int start_new_game(int id) {
+int start_new_game(std::string id) {
+
+    if (!valid_id(id)) {
+        // TODO send error message
+        return -1;
+    }
+
+    // Connect to server
+
+    // Send ID and new game request
+
+    // Receive message
+
+    // Set word size
+
+    // Set maximum number of errors
 
     return 0; // 0 is a placeholder
 }
 
-int valid_id(string id) {
-    char i = 0;
+int valid_id(std::string id) {
+    int i = 0;
 
-    while (id[i] != '\0')
+    if (id.size() != 6) {
+        return -1;
+    }
+
+    while (id[i] != '\0' || id[i] != '\n') {
+        if (!isdigit(id[i])) {
+            return -1;
+        }
+        i++;
+    }
+    return 0;
 }
