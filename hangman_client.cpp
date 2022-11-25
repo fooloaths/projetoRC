@@ -49,3 +49,9 @@ int start_new_game(int id) {
 
     return 0; // 0 is a placeholder
 }
+
+int valid_id(string id) {
+    char i = 0;
+
+    while (id[i] != '\0')
+}
