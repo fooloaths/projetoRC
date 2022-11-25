@@ -27,6 +27,7 @@ Mateus Pinho - ist199282
 #include <netdb.h>
 #include <cstring>
 #include <unistd.h>
+#include <iostream>
 
 // TODO don't add \n from hint to file
 
@@ -74,7 +75,19 @@ int main(int argc, char *argv[]) {
     if (errorcode != 0) exit(1); 
 
     /* main program code */
-    printf("Welcome to Hangman!\n");
+    // wait for the user to input an ID
+    std::string command;
+    std::cin >> command;
+    
+    // split command in two strings using space as delimiter
+    // TODO change this
+    std::string command = command.substr(0, command.find(" "));
+    std::string input = command.substr(command.find(" ") + 1);
+
+    // check if the command is equal to "start"
+    if (command == "start") {
+        start_new_game(input);
+    }
 
     freeaddrinfo(res);
     close(fd);
