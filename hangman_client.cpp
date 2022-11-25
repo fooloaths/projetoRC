@@ -1,7 +1,13 @@
-/* 
-hangman client
-gonçalo nunes
-mateus pinho
+/* +---+
+   |   |
+   O   |
+  /|\  |
+  / \  |
+       |
+========
+
+Gonçalo Nunes - ist199229
+Mateus Pinho - ist199282
 */
 
 // main function that takes two arguments from the command line
@@ -12,6 +18,17 @@ mateus pinho
 #include "hangman_client.hpp"
 #include <stdio.h>
 #include <stdlib.h>
+
+// TODO don't add \n from hint to file
+
+/* Constants */
+#define BLOCK_SIZE 256
+
+/* Global variables */
+int move_number = 1;
+
+int start_new_game(string id);
+int valid_id(string id);
 
 int main(int argc, char *argv[])
 {
@@ -26,4 +43,9 @@ int main(int argc, char *argv[])
     // get the server's IP address and port number
     char *server_ip = argv[1];
     int server_port = atoi(argv[2]);
+}
+
+int start_new_game(int id) {
+
+    return 0; // 0 is a placeholder
 }
