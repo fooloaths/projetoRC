@@ -26,7 +26,6 @@ Mateus Pinho - ist199282
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <cstring>
-#include <tuple>
 #include <unistd.h>
 
 // TODO don't add \n from hint to file
