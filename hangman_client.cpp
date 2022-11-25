@@ -10,11 +10,6 @@ Gonçalo Nunes - ist199229
 Mateus Pinho - ist199282
 */
 
-// main function that takes two arguments from the command line
-// the first argument is the server's IP address
-// the second argument is the server's port number
-
-// this should have something in it but i dont remember how include files work
 #include "hangman_client.hpp"
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,8 +24,6 @@ Mateus Pinho - ist199282
 #include <unistd.h>
 #include <iostream>
 
-// TODO don't add \n from hint to file
-
 /* Constants */
 #define BLOCK_SIZE 256
 
@@ -38,7 +31,7 @@ Mateus Pinho - ist199282
 int move_number = 1;
 
 int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
-int valid_id(std::string id);
+// // int valid_id(std::string id);
 int receive_message(int fd, socklen_t addrlen, sockaddr_in addr, char* buffer, size_t buf_size);
 int send_message(int fd, char message[], size_t buf_size, struct addrinfo res);
 
@@ -121,17 +114,11 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
 }
 
 int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-
-    if (!valid_id(id)) {
-        // TODO send error message
-        return -1;
-    }
-
     // Send ID and new game request
     std::string message = "SNG " + id + "\n";
     send_message(fd, message.c_str(), message.length(), res);
 
-    // TODO Receive messageww
+    // TODO Receive message
     // ! fix the buffer being block size
     char buffer[BLOCK_SIZE];
     receive_message(fd, addr, buffer, BLOCK_SIZE);
@@ -143,7 +130,7 @@ int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr
 
     std::string response_command = response.substr(0 , response.find(' '));
     if (response_command == "ERR") {
-        // TODO send error message
+        printf("Error.\n");
         return -1;
     }
     
@@ -169,18 +156,18 @@ int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr
     return 0; // 0 is a placeholder
 }
 
-int valid_id(std::string id) {
-    int i = 0;
+// // int valid_id(std::string id) {
+// //     int i = 0;
 
-    if (id.size() != 6) {
-        return -1;
-    }
+// //     if (id.length() != 6) {
+// //         return -1;
+// //     }
 
-    while (id[i] != '\0' || id[i] != '\n') {
-        if (!isdigit(id[i])) {
-            return -1;
-        }
-        i++;
-    }
-    return 0;
-}
+// //     while (id[i] != '\0' || id[i] != '\n') {
+// //         if (!isdigit(id[i])) {
+// //             return -1;
+// //         }
+// //         i++;
+// //     }
+// //     return 0;
+// // }
