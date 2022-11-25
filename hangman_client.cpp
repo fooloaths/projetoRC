@@ -75,18 +75,18 @@ int main(int argc, char *argv[]) {
     if (errorcode != 0) exit(1); 
 
     /* main program code */
-    // wait for the user to input an ID
-    std::string input;
-    std::cin >> input;
     
-    // split command in two strings using space as delimiter
-    // TODO change this
-    std::string command = command.substr(0, command.find(" "));
-    std::string message = command.substr(command.find(" ") + 1);
+    while (1) {
+        std::string input;
+        std::getline(std::cin, input);
 
-    // check if the command is equal to "start"
-    if (command == "start") {
-        start_new_game(message, fd, res, addr);
+        // split input in two strings using space as delimiter, doesnt account for malformed input
+        std::string command = input.substr(0 , input.find(' '));
+        std::string message = input.substr(input.find(' ') + 1, input.length());
+        // check if the command is equal to "start"
+        if (command == "start") {
+            start_new_game(message, fd, res, addr);
+        }
     }
 
     freeaddrinfo(res);
@@ -128,12 +128,14 @@ int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr
     }
     // Send ID and new game request
     char message[BLOCK_SIZE];
-    sprintf(message, "SNG %s", id.c_str());
+    sprintf(message, "SNG %s\n", id.c_str());
     send_message(fd, message, BLOCK_SIZE, res);
+    printf("Sent message: %s", message);
     // Receive message
     char buffer[BLOCK_SIZE];
     receive_message(fd, addr, buffer);
-    printf(buffer);
+    printf("Server response, %s", buffer);
+
     // Set word size
 
     // Set maximum number of errors
