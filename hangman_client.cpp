@@ -18,7 +18,8 @@ int main(int argc, char *argv[])
     // check if the number of arguments is correct
     if (argc != 3)
     {
-        printf("Error, try running it like this: %s <server IP> <server port>\n", argv[0]);
+        printf("Input Error: Incorrect number of arguments.\nExpected 2 arguments, received %d\n", argc - 1);
+        printf("\nTry running the program in the following format: %s <server IP> <server port>\n\n", argv[0]);
         exit(1);
     }
 
