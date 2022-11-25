@@ -25,6 +25,9 @@ Mateus Pinho - ist199282
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <cstring>
+#include <tuple>
+#include <unistd.h>
 
 // TODO don't add \n from hint to file
 
@@ -56,10 +59,25 @@ int main(int argc, char *argv[]) {
 
     // get the server's IP address and port number
     char *server_ip = argv[1];
-    int server_port = atoi(argv[2]);
+    char *server_port = argv[2];
 
     // create a socket
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd == -1) exit(1);
 
+    // set the server's address
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    errorcode = getaddrinfo(server_ip, server_port, &hints, &res);
+    if (errorcode != 0) exit(1); 
+
+    /* main program code */
+    printf("Welcome to Hangman!\n");
+
+    freeaddrinfo(res);
+    close(fd);
 }
 
 int start_new_game(std::string id) {
