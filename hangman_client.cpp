@@ -345,4 +345,3 @@ int exit_game(int fd, struct addrinfo *res) {
 // //         i++;
 // //     }
 // //     return 0;
-// // }
