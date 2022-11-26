@@ -26,14 +26,56 @@ Mateus Pinho - ist199282
 
 /* Constants */
 #define BLOCK_SIZE 256
+#define INPUT 128 // TODO rethink this value
+#define START "start"
+#define SG "sg"
+#define SCOREBOARD "scoreboard"
+#define SB "sb"
+#define PLAY "play"
+#define PL "pl"
+#define GUESS "guess"
+#define GW "gw"
+#define HINT "hint"
+#define H "h"
+#define STATE "state"
+#define ST "st"
+#define QUIT "quit"
+#define EXIT "exit"
+#define TRUE 1
+#define FALSE 0
+#define COMMAND_SIZE 11 // Largest command keyword is scoreboard. Add 1 for '\0'
+#define QUT "QUT"
+#define PLG "PLG"
+#define RLG "RLG"
+#define OK "OK"
+#define WIN "WIN"
+#define DUP "DUP"
+#define NOK "NOK"
+#define OVR "OVR"
+#define INV "INV"
+#define ERR "ERR"
+#define VICTORY_MESSAGE "WELL DONE! You guessed: "
 
 /* Global variables */
 int move_number = 1;
+std::string player_id;
+std::string word = "_____";
 
 int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
-// // int valid_id(std::string id);
-int receive_message(int fd, socklen_t addrlen, sockaddr_in addr, char* buffer, size_t buf_size);
-int send_message(int fd, char message[], size_t buf_size, struct addrinfo res);
+//int valid_id(std::string id);
+int receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
+int send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
+int exit_game(int fd, struct addrinfo *res);
+std::string play_result(std::string message);
+int play_aux_ok(std::string message, char letter);
+int play(int fd, struct sockaddr_in addr, char message[], char letter);
+std::string format_word();
+
+
+
+// TODO add checks to see if the move_numbers make sense when communicating with the server
+// TODO sprintf is always used alongside send_message. Maybe abstract it
+
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
@@ -57,7 +99,9 @@ int main(int argc, char *argv[]) {
 
     // create a socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd == -1) exit(1);
+    if (fd == -1) {
+        exit(1);
+    }
 
     // set the server's address
     memset(&hints, 0, sizeof(hints));
@@ -65,7 +109,9 @@ int main(int argc, char *argv[]) {
     hints.ai_socktype = SOCK_DGRAM;
 
     errorcode = getaddrinfo(server_ip, server_port, &hints, &res);
-    if (errorcode != 0) exit(1); 
+    if (errorcode != 0) {
+        exit(1); // TODO set error message + close socket
+    }
 
     /* main program code */
     
@@ -84,6 +130,20 @@ int main(int argc, char *argv[]) {
 
     freeaddrinfo(res);
     close(fd);
+}
+
+std::string format_word() {
+    int len = word.length();
+
+    std::string formatted_word;
+    int i;
+    for (i = 0; i < len; i++) {
+        formatted_word.push_back(toupper(word[i]));
+        formatted_word.push_back(' ');
+    }
+    formatted_word.pop_back();
+
+    return formatted_word;
 }
 
 int receive_message(int fd, struct sockaddr_in addr, char* buffer, size_t buf_size) {
@@ -115,6 +175,7 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
 
 int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     // Send ID and new game request
+    player_id = id;
     std::string message = "SNG " + id + "\n";
     send_message(fd, message.c_str(), message.length(), res);
 
@@ -156,6 +217,120 @@ int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr
     return 0; // 0 is a placeholder
 }
 
+// TODO maybe rename to play_status
+std::string play_result(std::string message) {
+    int i = 4; // Skip reply signature (RLG) and space
+
+    std::string status;
+    while (message[i] != ' ') {
+        status.push_back(message[i]);
+        i++;
+    }
+
+    return status;
+}
+
+int play_aux_ok(std::string message, char letter) {
+    int i = 8; // Skip to trial number () RLG OK
+    int trial_number = 0;
+    while (message[i] != ' ') {
+        trial_number = trial_number * 10 + (message[i] - '0');
+        i++;
+    }
+    i++; // Skip space
+
+    if (trial_number != move_number) {
+        return -1;
+    }
+
+
+    int pos = 0;
+    while (message[i] != '\0') {
+        if (message[i] == ' ') {
+            // Update knowledge of word;
+            word[pos] = letter;
+            pos = 0;
+        }
+        else {
+            pos = pos * 10 + (message[i] - '\0');
+        }
+
+        i++;
+    }
+
+    // Print current knowledge of the word
+    printf("Word: %s\n", format_word().c_str());
+
+    return 0;
+}
+
+int play(int fd, struct addrinfo *res, struct sockaddr_in addr,
+        char buffer[], size_t buf_size, char letter) {
+
+    // Send message
+    std::string message = PLG + player_id + letter + std::to_string(move_number) + '\n';
+    // // int err = sprintf(message, "%s %s %c %d", QUT, player_id.c_str(), letter, move_number);
+    /*if (err < 0) {
+        printf("Error (play): An error occured while preparing the exit message\n");
+    }*/
+
+    int err = send_message(fd, message.c_str(), message.length(), res);
+    if (err == -1) {
+        printf("Error (play): An error occured while sending the exit message\n");
+    }
+
+    // Receive message
+    err = receive_message(fd, addr, buffer, buf_size);
+    if (err == -1) {
+        printf("Error (play): An error occured while receiving a message from the server\n");
+    }
+
+    // Check if play was successful
+    std::string status = play_result(message); // TODO maybe use switch case
+    if (status.compare(OK)) {
+        if (play_aux_ok(message, letter) == -1) {
+            printf("The trial numbers don't match\n");
+        }
+    }
+    else if (status.compare(WIN)) {
+        printf("%s%s\n", VICTORY_MESSAGE, format_word().c_str());
+    }
+    else if (status.compare(DUP)) {
+
+    }
+    else if (status.compare(NOK)) {
+        
+    }
+    else if (status.compare(OVR)) {
+        printf("The letter guessed %c was incorrect. There are no more attempts available\n");        
+    }
+    else if (status.compare(INV)) {
+        
+    }
+    else if (status.compare(ERR)) {
+        
+    }
+    else {
+
+    }
+
+    return 0;
+}
+
+int exit_game(int fd, struct addrinfo *res) {
+
+    std::string message = QUT + player_id + '\n';
+
+    int err = send_message(fd, message.c_str(), message.length(), res);
+    if (err == -1) {
+        printf("Error (exit_game): An error occured while sending the exit message\n");
+    }
+
+    // TODO close TCP connections
+
+    return 0;
+}
+
 // // int valid_id(std::string id) {
 // //     int i = 0;
 
@@ -170,4 +345,3 @@ int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr
 // //         i++;
 // //     }
 // //     return 0;
-// // }
