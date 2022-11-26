@@ -293,16 +293,16 @@ int play(int fd, struct addrinfo *res, struct sockaddr_in addr,
         }
     }
     else if (status.compare(WIN)) {
-        printf("%s%s", VICTORY_MESSAGE, format_word().c_str());
+        printf("%s%s\n", VICTORY_MESSAGE, format_word().c_str());
     }
     else if (status.compare(DUP)) {
-        
+
     }
     else if (status.compare(NOK)) {
         
     }
     else if (status.compare(OVR)) {
-        
+        printf("The letter guessed %c was incorrect. There are no more attempts available\n");        
     }
     else if (status.compare(INV)) {
         
