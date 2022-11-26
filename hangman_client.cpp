@@ -68,11 +68,14 @@ int send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
 int exit_game(int fd, struct addrinfo *res);
 std::string play_result(std::string message);
 int play_aux_ok(std::string message, char letter);
-int play(int fd, struct addrinfo *res, struct sockaddr_in addr, char buffer[], size_t buf_size, char letter);
+int play(int fd, struct sockaddr_in addr, char message[], char letter);
 std::string format_word();
+
+
 
 // TODO add checks to see if the move_numbers make sense when communicating with the server
 // TODO sprintf is always used alongside send_message. Maybe abstract it
+
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
@@ -122,9 +125,6 @@ int main(int argc, char *argv[]) {
         // check if the command is equal to "start"
         if (command == "start") {
             start_new_game(message, fd, res, addr);
-        }
-        if (command == "play" || command == "pl") {
-            play(fd, res, addr, buffer, BLOCK_SIZE, message[0]);
         }
     }
 
@@ -326,7 +326,6 @@ int exit_game(int fd, struct addrinfo *res) {
         printf("Error (exit_game): An error occured while sending the exit message\n");
     }
 
-
     // TODO close TCP connections
 
     return 0;
@@ -346,4 +345,3 @@ int exit_game(int fd, struct addrinfo *res) {
 // //         i++;
 // //     }
 // //     return 0;
-// // }
