@@ -23,59 +23,25 @@ Mateus Pinho - ist199282
 #include <cstring>
 #include <unistd.h>
 #include <iostream>
-
-/* Constants */
-#define BLOCK_SIZE 256
-#define INPUT 128 // TODO rethink this value
-#define START "start"
-#define SG "sg"
-#define SCOREBOARD "scoreboard"
-#define SB "sb"
-#define PLAY "play"
-#define PL "pl"
-#define GUESS "guess"
-#define GW "gw"
-#define HINT "hint"
-#define H "h"
-#define STATE "state"
-#define ST "st"
-#define QUIT "quit"
-#define EXIT "exit"
-#define TRUE 1
-#define FALSE 0
-#define COMMAND_SIZE 11 // Largest command keyword is scoreboard. Add 1 for '\0'
-#define QUT "QUT"
-#define PLG "PLG"
-#define RLG "RLG"
-#define OK "OK"
-#define WIN "WIN"
-#define DUP "DUP"
-#define NOK "NOK"
-#define OVR "OVR"
-#define INV "INV"
-#define ERR "ERR"
-#define VICTORY_MESSAGE "WELL DONE! You guessed: "
+#include <vector>
 
 /* Global variables */
 int move_number = 1;
 std::string player_id;
-std::string word = "_____";
+std::string word = "";
 
 int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
-//int valid_id(std::string id);
+// //int valid_id(std::string id);
 int receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
 int send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
-int exit_game(int fd, struct addrinfo *res);
+int exit_game(std::string id, int fd, struct addrinfo *res);
 std::string play_result(std::string message);
 int play_aux_ok(std::string message, char letter);
-int play(int fd, struct sockaddr_in addr, char message[], char letter);
+int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in add);
 std::string format_word();
-
-
 
 // TODO add checks to see if the move_numbers make sense when communicating with the server
 // TODO sprintf is always used alongside send_message. Maybe abstract it
-
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
@@ -126,6 +92,16 @@ int main(int argc, char *argv[]) {
         if (command == "start") {
             start_new_game(message, fd, res, addr);
         }
+        else if (command == "play" || command == "pl") {
+            play(message, fd, res, addr);
+        }
+        else if (command == "quit" || command == "exit") {
+            exit_game(message, fd, res);
+            break;
+        }
+        else {
+            printf("Input Error: Invalid command.\n");
+        }
     }
 
     freeaddrinfo(res);
@@ -174,21 +150,20 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
 }
 
 int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    // Send ID and new game request
     player_id = id;
     std::string message = "SNG " + id + "\n";
+
     send_message(fd, message.c_str(), message.length(), res);
 
-    // TODO Receive message
     // ! fix the buffer being block size
     char buffer[BLOCK_SIZE];
     receive_message(fd, addr, buffer, BLOCK_SIZE);
     std::string response = buffer;
 
-    // split input in four strings using space as delimiter, doesnt account for malformed input
+
     // remove \n from response
     response.pop_back();
-
+    
     std::string response_command = response.substr(0 , response.find(' '));
     if (response_command == "ERR") {
         printf("Error.\n");
@@ -201,18 +176,17 @@ int start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr
 
     // convert number of letters into a number of underscores to print
     int n_letters_int = std::stoi(n_letters);
-    std::string underscores = "";
     for (int i = 0; i < n_letters_int; i++) {
-        underscores += "_ ";
+        word += "_";
     }
 
     // ! code down sucks
-    // // if (status != "OK") {
+    // // if (status == "OK") {
     // //     // TODO send error message
     // //     return -1;
     // // }
-
-    printf("New game started (max %s errors): %s\n", max_errors.c_str(), underscores.c_str());
+    std::string formatted_word = format_word();
+    printf("New game started (max %s errors): %s\n", max_errors.c_str(), formatted_word.c_str());
     
     return 0; // 0 is a placeholder
 }
@@ -230,49 +204,51 @@ std::string play_result(std::string message) {
     return status;
 }
 
-int play_aux_ok(std::string message, char letter) {
-    int i = 8; // Skip to trial number () RLG OK
-    int trial_number = 0;
-    while (message[i] != ' ') {
-        trial_number = trial_number * 10 + (message[i] - '0');
-        i++;
-    }
-    i++; // Skip space
+// TODO rewrite this function
+std::string play_aux_ok(char* message, std::string letter) {
+    std::string word_pos = message;
+    word_pos.pop_back();
+    word_pos = word_pos.substr(word_pos.find(' ', word_pos.find(' ', word_pos.find(' ') + 1) + 1) + 1, word_pos.length());
 
-    if (trial_number != move_number) {
-        return -1;
-    }
-
-
-    int pos = 0;
-    while (message[i] != '\0') {
-        if (message[i] == ' ') {
-            // Update knowledge of word;
-            word[pos] = letter;
-            pos = 0;
+    // transform word_pos into a vector of ints
+    std::vector<int> word_pos_int;
+    std::string word_pos_int_str;
+    for (int i = 0; i < word_pos.length(); i++) {
+        if (word_pos[i] == ' ') {
+            word_pos_int.push_back(std::stoi(word_pos_int_str));
+            word_pos_int_str.clear();
         }
         else {
-            pos = pos * 10 + (message[i] - '\0');
+            word_pos_int_str.push_back(word_pos[i]);
         }
+    }
+    word_pos_int.push_back(std::stoi(word_pos_int_str));
 
-        i++;
+    // update word
+    for (int i = 0; i < word_pos_int.size(); i++) {
+        word[word_pos_int[i]] = letter[0];
     }
 
-    // Print current knowledge of the word
-    printf("Word: %s\n", format_word().c_str());
+    std::string formatted_word = format_word();
 
-    return 0;
+    return formatted_word;
+    
 }
 
-int play(int fd, struct addrinfo *res, struct sockaddr_in addr,
-        char buffer[], size_t buf_size, char letter) {
-
+int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
+    // TODO fix buffer being block size
+    char buffer[BLOCK_SIZE];
+    size_t buf_size = BLOCK_SIZE;
+    
     // Send message
-    std::string message = PLG + player_id + letter + std::to_string(move_number) + '\n';
+
+    std::string message = "PLG " + player_id + ' ' + letter + ' ' + std::to_string(move_number) + '\n';
+    // // printf("Sending message: %s", message.c_str());
     // // int err = sprintf(message, "%s %s %c %d", QUT, player_id.c_str(), letter, move_number);
     /*if (err < 0) {
         printf("Error (play): An error occured while preparing the exit message\n");
     }*/
+
 
     int err = send_message(fd, message.c_str(), message.length(), res);
     if (err == -1) {
@@ -286,28 +262,27 @@ int play(int fd, struct addrinfo *res, struct sockaddr_in addr,
     }
 
     // Check if play was successful
-    std::string status = play_result(message); // TODO maybe use switch case
-    if (status.compare(OK)) {
-        if (play_aux_ok(message, letter) == -1) {
-            printf("The trial numbers don't match\n");
-        }
+    std::string status = play_result(buffer); // TODO maybe use switch case
+    if (status.compare(OK) == 0) {
+        word = play_aux_ok(buffer, letter);
+        printf("YOU ARE RIGHT!!! THE WORD NOW IS %s\n", word.c_str());
     }
-    else if (status.compare(WIN)) {
+    else if (status.compare(WIN) == 0) {
         printf("%s%s\n", VICTORY_MESSAGE, format_word().c_str());
+        printf("NOT A SINGLE ERROR!!! YOU ARE A GENIUS!!!\n");
     }
-    else if (status.compare(DUP)) {
-
+    else if (status.compare(DUP) == 0) {
+        printf("YOU ALREADY TRIED THIS LETTER!!!\n");
     }
-    else if (status.compare(NOK)) {
+    else if (status.compare(NOK) == 0) {
+        printf("YOU ARE WRONG!!!\n");
+    }
+    else if (status.compare(OVR) == 0) {
+    }
+    else if (status.compare(INV) == 0) {
         
     }
-    else if (status.compare(OVR)) {
-        printf("The letter guessed %c was incorrect. There are no more attempts available\n");        
-    }
-    else if (status.compare(INV)) {
-        
-    }
-    else if (status.compare(ERR)) {
+    else if (status.compare(ERR) == 0) {
         
     }
     else {
@@ -317,9 +292,10 @@ int play(int fd, struct addrinfo *res, struct sockaddr_in addr,
     return 0;
 }
 
-int exit_game(int fd, struct addrinfo *res) {
+int exit_game(std::string id, int fd, struct addrinfo *res) {
 
-    std::string message = QUT + player_id + '\n';
+    std::string message = "QUT " + id + '\n';
+    printf("Sending message: %s", message.c_str());
 
     int err = send_message(fd, message.c_str(), message.length(), res);
     if (err == -1) {
