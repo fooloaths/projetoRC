@@ -31,10 +31,13 @@ Mateus Pinho - ist199282
 #include <signal.h>
 #include <iostream>
 #include <fstream>
+#include <unordered_map>
 
 // TODO don't add \n from hint to file
 // TODO check if ID is already in use
 // TODO 10 mágico na FindTopScore???
+// TODO quando recebemos certos comandos, temos de ver se há um jogo ativo para esse PLID
+// TODO maybe delete server init
 
 #define NUMBER_THREADS 16
 #define BLOCK_SIZE 256
@@ -47,9 +50,10 @@ Mateus Pinho - ist199282
 int server_init();
 int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res);
 struct request* process_input(char buffer[]);
-std::string get_word_from_file();
+std::string get_random_word_from_file();
 int treat_request(int fd, struct addrinfo *res, struct request *req);
 void treat_start(int fd, struct addrinfo *res, struct request *req);
+void treat_guess(int fd, struct addrinfo *res, struct request *req);
 int FindLastGame(char *PLID, char *fname);
 /*int FindTopScores(SCORELIST ∗list)*/
 
@@ -58,32 +62,20 @@ struct request {
     std::string PLID;
     std::string letter_word;
     std::string trial;
-    /*char buffer[FILE_NAME_SIZE];
-    char *dynamic_buffer;
-    int fhandle;
-    size_t len;*/
 };
 
-/*struct session {
-    int session_id;
-    int trial_number;
+struct game {
+    std::string PLID;
     std::string word;
-    pthread_mutex_t client_mutex;
-    pthread_cond_t client_cond_var;
-};*/
-
+    std::string max_errors;
+    std::string move_number;
+};
 
 std::vector<int> session_ids;
-//static char client_pipes[S][PIPE_PATH_SIZE];
 static pthread_mutex_t id_table_mutex;
-std::vector<pthread_mutex_t> client_mutexes;
-std::vector<pthread_cond_t> client_cond_var;
-static pthread_t threads[NUMBER_THREADS];
 std::string word_file = "word_file";
 FILE* fp_word_file;
-//static pthread_t threads[S];
-//static pthread_mutex_t client_mutexes[S];
-//static pthread_cond_t client_cond_var[S];
+std::unordered_map<std::string, struct game*> active_games; // Key should be a PLID
 
 
 int main(int argc, char **argv) {
@@ -96,8 +88,6 @@ int main(int argc, char **argv) {
     struct sockaddr_in addr;
     struct sigaction act;
     char buffer[BLOCK_SIZE];
-    //size_t r_buffer;
-    //char buff = '\0';
 
 
     if (argc < 2) {
@@ -177,24 +167,6 @@ int main(int argc, char **argv) {
             printf("Error (main): An error occured while sending a reply\n");
             exit(1);
         }
-
-        /*r_buffer = fread(&buff, 1, 1, fserv);
-        if (r_buffer == 0) {
-            if (fclose(fserv) != 0) {
-                return -1;
-            }
-            if ((fserv = fopen(pipename, "r")) == NULL) {
-                return -1;
-            }
-            continue;
-        }
-
-        if (treat_request(buff, fserv) == -1) {
-            if (fclose(fserv) != 0) {
-                return -1;
-            }
-            return -1;
-        }*/
     }
 
     freeaddrinfo(res);
@@ -258,7 +230,7 @@ struct request* process_input(char buffer[]) {
     return req;
 }
 
-std::string get_word_from_file() {
+std::string get_random_word_from_file() {
     int line = rand() % NUMBER_OF_WORDS;
 
     int line_num = 1;
@@ -268,24 +240,56 @@ std::string get_word_from_file() {
     }
 
     size_t buf_size = WORLD_LINE_SIZE;
+
+    /* Fetch a random line from the file */
     while (getline(&buffer, &buf_size, fp_word_file)) {
         if (line_num == line) {
             break;
         }
         memset(buffer, '\0', WORLD_LINE_SIZE);
     }
-    return std::string(buffer);
+
+    /* Extract word from file */
+    int i = 0;
+    std::string output;
+    while (buffer[i] != ' ') {
+        output.push_back(buffer[i]);
+        i++;
+    }
+
+    return output;
 }
 
 int treat_request(int fd, struct addrinfo *res, struct request *req) {
     if (req->op_code == SNG) {
+        /* Start New Game */
         treat_start(fd, res, req);
     }
     else if (req->op_code == PLG) {
-
+        /* Play Letter */
+    }
+    else if (req->op_code == PWG) {
+        /* Guess Word */
+        treat_guess(fd, res, req);
     }
 
     return 0;
+}
+
+void create_game_session(std::string word, char moves, std::string PLID) {
+    struct game *new_game = (struct game *) malloc(sizeof(struct game));
+    if (new_game == NULL) {
+        printf("Error (create_game_session): Ran out of memory\n");
+    }
+
+    /* Initialize game struct */
+    new_game->word = word;
+    new_game->PLID = PLID;
+    new_game->max_errors = moves;
+    new_game->move_number = "1";
+    
+    /* Add it to active games hashmap */
+    active_games[PLID] = new_game;
 }
 
 void treat_start(int fd, struct addrinfo *res, struct request *req) {
@@ -299,8 +303,7 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
     if (found == 0) {
         /* No active game found for player PLID */
         status = OK;
-        // TODO get word from word_file
-        std::string word = "mateus";
+        std::string word = get_random_word_from_file();
         char moves;
         suffix = suffix + std::to_string(word.length());
         if (word.length() <= 6) {
@@ -325,6 +328,64 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
     send_message(fd, message.c_str(), message.length(), res);
 }
 
+std::string get_first_line_from_game_file(struct request *req) {
+
+    FILE *fp;
+
+    /* Allocate memory for string containing path to active game */
+    char* fname = (char *) malloc(GAME_NAME * sizeof(char));
+    if (fname == NULL) {
+        printf("Error (get_first_line_from_game_file): Ran out of memory\n");
+    }
+
+    /* Store path to file on fname */
+    sprintf(fname, "GAMES/GAME_%s.txt", req->PLID);
+    
+    /* Allocate memory for string that will store first line from file */
+    char *buffer = (char *) malloc(WORLD_LINE_SIZE * sizeof(char));
+    if (buffer == NULL) {
+        printf("Error (get_first_line_from_game_file): Ran out of memory\n");
+    }
+    size_t buf_size = WORLD_LINE_SIZE;
+
+    /* Open game file */
+    fp = fopen(fname, "r");
+
+    /* Get first line from file */
+    getline(&buffer, &buf_size, fp);
+
+    return buffer;
+}
+
+std::string get_word(struct request *req) {
+    std::string line = get_first_line_from_game_file(req);
+
+    return strtok(&line[0], " ");
+}
+
+std::string get_hint_file_name(struct request *req) {
+    std::string line = get_first_line_from_game_file(req);
+
+
+    std::string token = strtok(&line[0], " ");
+    token = strtok(NULL, " ");
+
+    return token;
+}
+
+
+void treat_guess(int fd, struct addrinfo *res, struct request *req) {
+    /* Look for active games with req->PLID */
+
+    /* Get word and number of moves */
+    std::string real_word = get_word(req);
+
+    /* Compare number of moves to req->trials */
+
+    /* Compare res->word to the word */
+
+    /* Reply to client */
+}
 
 int FindLastGame(char *PLID, char *fname) {
     struct dirent **filelist;
@@ -399,65 +460,5 @@ int server_init() {
         return -1;
     }
 
-    /*for (size_t i = 0; i < S; i++) {
-        session_ids[i] = FREE;
-
-        if (pthread_mutex_init(&client_mutexes[i], NULL) != 0) {
-            return -1;
-        }
-
-        if (pthread_cond_init(&client_cond_var[i], NULL) != 0) {
-            return -1;
-        }
-
-        prod_cons_buffer[i][0].op_code = -1;
-        size_t *i_pointer = malloc(sizeof(*i_pointer));
-        if (i_pointer == NULL) {
-            return -1;
-        }
-        *i_pointer = i;
-        if (pthread_create(&threads[i], NULL, tfs_server_thread, (void*)i_pointer) != 0) {
-            return -1;
-        }
-
-        for (size_t j = 0; j < PIPE_PATH_SIZE; j++) {
-            client_pipes[i][j] = '\0';
-        }
-    }*/
-
     return 0;
 }
-
-//void* tfs_server_thread(void* args) {
-//    //int id = *((int *) args);
-//    //struct request *message = &prod_cons_buffer[id][0];
-//    
-//    while (1) {
-//        if (pthread_mutex_lock(&client_mutexes[id]) != 0) {
-//            /* Since something went wrong with the lock, we kill this worker
-////             * thread and place the corresponding ID as taken, so the main
-//             * thread doesn't try to mount new clients with this ID */
-//            session_ids[id] = TAKEN;
-//            pthread_exit(NULL);
-//        }
-//        while (message->op_code == -1) {
-//            if (pthread_cond_wait(&client_cond_var[id], &client_mutexes[id]) != 0) {
-//                session_ids[id] = TAKEN;
-//                pthread_exit(NULL);
-//            }
-//        }
-//        if (treat_request_thread(id) == -1) {
-//           message->op_code = -1;
-//            tfs_unmount(id);
-//            if (pthread_mutex_unlock(&client_mutexes[id]) != 0) {
-//                session_ids[id] = TAKEN;
-//                pthread_exit(NULL);
-//            }
-//        }
-//        message->op_code = -1;
-//        if (pthread_mutex_unlock(&client_mutexes[id]) != 0 ) {
-//            session_ids[id] = TAKEN;
-//            pthread_exit(NULL);
-//        }
-//    }
-//}*/
