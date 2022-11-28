@@ -247,7 +247,7 @@ std::string play_aux_ok(const char* message, std::string letter) {
 
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     // !! TODO fix buffer being block size
-    char buf[BLOCK_SIZE];
+    char buffer[BLOCK_SIZE];
     size_t buf_size = BLOCK_SIZE;
     
     if (letter.length() != 1 || !isalpha(letter[0])) {
@@ -271,28 +271,25 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     }
 
     // Receive message
-    err = receive_message(fd, addr, buf, buf_size);
+    err = receive_message(fd, addr, buffer, buf_size);
     if (err == -1) {
         printf("Error (play): An error occured while receiving a message from the server\n");
     }
     
-    std::string response = buf;
+    std::string response = buffer;
     // remove all characters after the first \n
     response = response.substr(0, response.find('\n') + 1);
-    const char* buffer = response.c_str();
-
+    const char* buf = response.c_str();
 
     // Check if play was successful
-    std::string status = play_result(buffer); // TODO maybe use switch case
+    std::string status = play_result(buf); // TODO maybe use switch case
     move_number++;
     if (status.compare(OK) == 0) {
-        printf("buff: %s\n", buffer);
-        word = play_aux_ok(buffer, letter);
+        word = play_aux_ok(buf, letter);
         printf("YOU ARE RIGHT!!! THE WORD NOW IS %s\n", format_word().c_str());
     }
     else if (status.compare(WIN) == 0) {
-        printf("buff: %s\n", buffer);
-        word = play_aux_ok(buffer, letter);
+        // // word = play_aux_ok(buffer, letter);
         printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", format_word().c_str());
     }
     else if (status.compare(DUP) == 0) {
