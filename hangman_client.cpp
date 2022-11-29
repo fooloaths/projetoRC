@@ -36,7 +36,7 @@ int receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
 int send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
 int exit_game(std::string id, int fd, struct addrinfo *res);
 std::string play_result(std::string message);
-int play_aux_ok(std::string message, char letter);
+std::string play_aux_ok(const char* message, std::string letter);
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in add);
 std::string format_word();
 
@@ -205,41 +205,56 @@ std::string play_result(std::string message) {
 }
 
 // TODO rewrite this function
-std::string play_aux_ok(char* message, std::string letter) {
+std::string play_aux_ok(const char* message, std::string letter) {
+
     std::string word_pos = message;
     word_pos.pop_back();
     word_pos = word_pos.substr(word_pos.find(' ', word_pos.find(' ', word_pos.find(' ') + 1) + 1) + 1, word_pos.length());
 
+    // split word_pos into two strings by the first space
+    int n = atoi(word_pos.substr(0, word_pos.find(' ')).c_str());
+    std::string positions = word_pos.substr(word_pos.find(' ') + 1, word_pos.length());
+
     // transform word_pos into a vector of ints
-    std::vector<int> word_pos_int;
-    std::string word_pos_int_str;
-    for (int i = 0; i < word_pos.length(); i++) {
-        if (word_pos[i] == ' ') {
-            word_pos_int.push_back(std::stoi(word_pos_int_str));
-            word_pos_int_str.clear();
+    if (positions != "") {
+        std::vector<int> word_pos_int;
+        std::string word_pos_int_str;
+        for (int i = 0; i < positions.length(); i++) {
+            if (positions[i] == ' ') {
+                word_pos_int.push_back(std::stoi(word_pos_int_str));
+                word_pos_int_str.clear();
+            }
+            else {
+                word_pos_int_str.push_back(positions[i]);
+            }
         }
-        else {
-            word_pos_int_str.push_back(word_pos[i]);
+        word_pos_int.push_back(std::stoi(word_pos_int_str));
+
+        // // // print the vector of ints
+        // // for (int i = 0; i < word_pos_int.size(); i++) {
+        // //     printf("%d", word_pos_int[i]);
+        // // }
+        
+        // update word
+        for (int i = 0; i < word_pos_int.size(); i++) {
+            word.at(word_pos_int.at(i) - 1) = letter[0];
         }
+
     }
-    word_pos_int.push_back(std::stoi(word_pos_int_str));
-
-    // update word
-    for (int i = 0; i < word_pos_int.size(); i++) {
-        word[word_pos_int[i]] = letter[0];
-    }
-
-    std::string formatted_word = format_word();
-
-    return formatted_word;
+    return word;
     
 }
 
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    // TODO fix buffer being block size
+    // !! TODO fix buffer being block size
     char buffer[BLOCK_SIZE];
     size_t buf_size = BLOCK_SIZE;
     
+    if (letter.length() != 1 || !isalpha(letter[0])) {
+        printf("Error (play): The letter must be a single character.\n");
+        return -1;
+    }
+
     // Send message
 
     std::string message = "PLG " + player_id + ' ' + letter + ' ' + std::to_string(move_number) + '\n';
@@ -260,42 +275,45 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     if (err == -1) {
         printf("Error (play): An error occured while receiving a message from the server\n");
     }
+    
+    std::string response = buffer;
+    // remove all characters after the first \n
+    response = response.substr(0, response.find('\n') + 1);
+    const char* buf = response.c_str();
 
     // Check if play was successful
-    std::string status = play_result(buffer); // TODO maybe use switch case
+    std::string status = play_result(buf); // TODO maybe use switch case
+    move_number++;
     if (status.compare(OK) == 0) {
-        word = play_aux_ok(buffer, letter);
-        printf("YOU ARE RIGHT!!! THE WORD NOW IS %s\n", word.c_str());
+        word = play_aux_ok(buf, letter);
+        printf("YOU ARE RIGHT!!! THE WORD NOW IS %s\n", format_word().c_str());
     }
     else if (status.compare(WIN) == 0) {
-        printf("%s%s\n", VICTORY_MESSAGE, format_word().c_str());
-        printf("NOT A SINGLE ERROR!!! YOU ARE A GENIUS!!!\n");
+        // // word = play_aux_ok(buffer, letter);
+        printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", format_word().c_str());
     }
     else if (status.compare(DUP) == 0) {
         printf("YOU ALREADY TRIED THIS LETTER!!!\n");
+        move_number--;
     }
     else if (status.compare(NOK) == 0) {
         printf("YOU ARE WRONG!!!\n");
     }
     else if (status.compare(OVR) == 0) {
+        printf("YOU LOST!!! YOU ARE DUMB!!!\n");
     }
     else if (status.compare(INV) == 0) {
-        
-    }
-    else if (status.compare(ERR) == 0) {
-        
+        printf("MESSAGE LOST IN TRAFFIC!!!\n");
     }
     else {
-
+        printf("ERROR!!!\n");
+        move_number--;
     }
-
     return 0;
 }
 
 int exit_game(std::string id, int fd, struct addrinfo *res) {
-
     std::string message = "QUT " + id + '\n';
-    printf("Sending message: %s", message.c_str());
 
     int err = send_message(fd, message.c_str(), message.length(), res);
     if (err == -1) {
