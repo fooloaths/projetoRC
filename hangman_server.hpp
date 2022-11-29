@@ -11,3 +11,9 @@
 #define RSG "RSG"
 #define REV "REV"
 #define SNG "SNG"
+#define PWG "PWG"
+#define T "T"
+#define G "G"
+#define LINE_SIZE 32
+
+#define ACTIVE_GAME_PATH "GAMES/GAME_"
