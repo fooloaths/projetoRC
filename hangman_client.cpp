@@ -77,17 +77,17 @@ int main(int argc, char *argv[]) {
         std::string command = input.substr(0 , input.find(' '));
         std::string message = input.substr(input.find(' ') + 1, input.length());
         // check if the command is equal to "start"
-        if (command == "start") {
+        if (command == START || command == SG) {
             start_new_game(message, fd, res, addr);
-        } else if (command == "play" || command == "pl") {
+        } else if (command == PLAY || command == PL) {
             // TODO CHECK NUMBER OF MOVES
             play(message, fd, res, addr);
-        } else if (command == "quit") {
+        } else if (command == QUIT) {
             exit_game(message, fd, res);
-        } else if (command == "exit") {
+        } else if (command == EXIT) {
             exit_game(message, fd, res);
             break;
-        } else if (command == "guess" || command == "gw") {
+        } else if (command == GUESS || command == GW) {
             // TODO CHECK NUMBER OF MOVES
             guess(message, fd, res, addr);
         } else {
@@ -123,7 +123,7 @@ void send_message(int fd, const char* message, size_t buf_size, struct addrinfo 
 
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     player_id = id;
-    std::string message = "SNG " + id + "\n";
+    std::string message = SNG + id + "\n";
     send_message(fd, message.c_str(), message.length(), res);
 
     char buffer[BLOCK_SIZE];
@@ -133,7 +133,7 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     // remove \n from response
     response.pop_back();    
     std::string response_command = response.substr(0 , response.find(' '));
-    if (response_command == "ERR") {
+    if (response_command == ERR) {
         printf("el servidor no esta muy bueno ya?\n");
         exit(1);
     }
@@ -148,7 +148,7 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
         word += "_";
     }
 
-    if (status != "OK") {
+    if (status != OK) {
         printf("el servidor no esta muy bueno ya?\n");
         exit(1);
     }
@@ -237,7 +237,7 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
     size_t buf_size = BLOCK_SIZE;
 
     // Send message
-    std::string message = "PWG " + player_id + ' ' + guess_word + ' ' +  std::to_string(move_number) + '\n';
+    std::string message = PWG + player_id + ' ' + guess_word + ' ' +  std::to_string(move_number) + '\n';
 
     send_message(fd, message.c_str(), message.length(), res);
     receive_message(fd, addr, buffer, buf_size);
@@ -273,7 +273,7 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
         return -1;
     }
 
-    std::string message = "PLG " + player_id + ' ' + letter + ' ' + std::to_string(move_number) + '\n';
+    std::string message = PLG + player_id + ' ' + letter + ' ' + std::to_string(move_number) + '\n';
     send_message(fd, message.c_str(), message.length(), res);
     receive_message(fd, addr, buffer, buf_size);
     
@@ -307,7 +307,7 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
 }
 
 int exit_game(std::string id, int fd, struct addrinfo *res) {
-    std::string message = "QUT " + id + '\n';
+    std::string message = QUT + id + '\n';
 
     send_message(fd, message.c_str(), message.length(), res);
 

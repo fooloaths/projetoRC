@@ -18,9 +18,11 @@
 #define TRUE 1
 #define FALSE 0
 #define COMMAND_SIZE 11 // Largest command keyword is scoreboard. Add 1 for '\0'
-#define QUT "QUT"
-#define PLG "PLG"
+#define SNG "SNG "
+#define QUT "QUT "
+#define PLG "PLG "
 #define RLG "RLG"
+#define PWG "PWG "
 #define OK "OK"
 #define WIN "WIN"
 #define DUP "DUP"
