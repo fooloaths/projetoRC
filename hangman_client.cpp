@@ -40,9 +40,6 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
 std::string format_word(std::string word_to_format = word);
 int guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in addr);
 
-// TODO add checks to see if the move_numbers make sense when communicating with the server
-// TODO sprintf is always used alongside send_message. Maybe abstract it
-
 int main(int argc, char *argv[]) {
     int fd, errorcode;
     struct addrinfo hints, *res;
@@ -103,12 +100,11 @@ int main(int argc, char *argv[]) {
 }
 
 std::string format_word(std::string word_to_format) {
-    int len = word_to_format.length();
+    auto len = word_to_format.length();
 
     std::string formatted_word;
-    int i;
-    for (i = 0; i < len; i++) {
-        formatted_word.push_back(toupper(word_to_format[i]));
+    for (size_t i = 0; i < len; i++) {
+        formatted_word.push_back((char)toupper(word_to_format[i]));
         formatted_word.push_back(' ');
     }
     formatted_word.pop_back();
@@ -161,13 +157,12 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     printf("New game started (max %s errors): %s\n", max_errors.c_str(), formatted_word.c_str());
 }
 
-// TODO maybe rename to play_status
 std::string get_status(std::string message) {
-    int i = 4; // Skip reply signature (RLG) and space
+    size_t i = 4; // Skip reply signature (RLG) and space
 
     std::string status;
     while (message[i] != ' ') {
-        status.push_back(message[i]);
+        status.push_back(message[(size_t)i]);
         i++;
     }
 
@@ -175,9 +170,9 @@ std::string get_status(std::string message) {
 }
 
 // function to return the positions of underscores in a word
-std::vector<int> get_underscore_positions(std::string message) {
-    std::vector<int> positions;
-    int i = 0;
+auto get_underscore_positions(std::string message) {
+    std::vector<size_t> positions;
+    size_t i = 0;
     for (char c : message) {
         if (c == '_') {
             positions.push_back(i);
@@ -188,8 +183,8 @@ std::vector<int> get_underscore_positions(std::string message) {
     return positions;
 }
 
-std::string play_win_ok(const char* message, std::string letter) {
-    std::vector<int> positions = get_underscore_positions(word);
+std::string play_win_ok(std::string letter) {
+    auto positions = get_underscore_positions(word);
 
     // if there are no underscores, there is a bug somewhere
     if (positions.size() == 0) {
@@ -198,7 +193,7 @@ std::string play_win_ok(const char* message, std::string letter) {
     }
 
     // replace all underscores with the letter
-    for (int i : positions) {
+    for (size_t i : positions) {
         word[i] = letter[0];
     }
 
@@ -211,26 +206,25 @@ std::string play_aux_ok(const char* message, std::string letter) {
     word_pos = word_pos.substr(word_pos.find(' ', word_pos.find(' ', word_pos.find(' ') + 1) + 1) + 1, word_pos.length());
 
     // split word_pos into two strings by the first space
-    int n = atoi(word_pos.substr(0, word_pos.find(' ')).c_str());
     std::string positions = word_pos.substr(word_pos.find(' ') + 1, word_pos.length());
 
     // transform word_pos into a vector of ints
     if (positions != "") {
-        std::vector<int> word_pos_int;
+        std::vector<size_t> word_pos_int;
         std::string word_pos_int_str;
-        for (int i = 0; i < positions.length(); i++) {
+        for (size_t i = 0; i < positions.length(); i++) {
             if (positions[i] == ' ') {
-                word_pos_int.push_back(std::stoi(word_pos_int_str));
+                word_pos_int.push_back((size_t)std::stoi(word_pos_int_str));
                 word_pos_int_str.clear();
             }
             else {
                 word_pos_int_str.push_back(positions[i]);
             }
         }
-        word_pos_int.push_back(std::stoi(word_pos_int_str));
+        word_pos_int.push_back((size_t)std::stoi(word_pos_int_str));
 
         // update word
-        for (int i = 0; i < word_pos_int.size(); i++) {
+        for (size_t i = 0; i < word_pos_int.size(); i++) {
             word.at(word_pos_int.at(i) - 1) = letter[0];
         }
     }
@@ -271,7 +265,6 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
 }
 
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    // !! TODO fix buffer being block size
     char buffer[BLOCK_SIZE];
     size_t buf_size = BLOCK_SIZE;
     
@@ -289,13 +282,13 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     response = response.substr(0, response.find('\n') + 1);
     const char* buf = response.c_str();
 
-    std::string status = get_status(buf); // TODO maybe use switch case
+    std::string status = get_status(buf);
     move_number++;
     if (status.compare(OK) == 0) {
         word = play_aux_ok(buf, letter);
         printf("YOU ARE RIGHT!!! THE WORD NOW IS %s\n", format_word().c_str());
     } else if (status.compare(WIN) == 0) {
-        word = play_win_ok(buf, letter);
+        word = play_win_ok(letter);
         printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", format_word().c_str());
     } else if (status.compare(DUP) == 0) {
         printf("YOU ALREADY TRIED THIS LETTER!!!\n");
