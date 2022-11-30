@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
         std::getline(std::cin, input);
 
         // split input in two strings using space as delimiter, doesnt account for malformed input
+        // TODO fix input splitting
         std::string command = input.substr(0 , input.find(' '));
         std::string message = input.substr(input.find(' ') + 1, input.length());
         // check if the command is equal to "start"
@@ -131,13 +132,15 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     std::string response = buffer;
 
     // remove \n from response
-    response.pop_back();    
+    response.pop_back();
+    // TODO fix input splitting    
     std::string response_command = response.substr(0 , response.find(' '));
     if (response_command == ERR) {
         printf("el servidor no esta muy bueno ya?\n");
         exit(1);
     }
     
+    // TODO fix input splitting
     std::string status = get_status(response);
     std::string n_letters = response.substr(response.find(' ', response.find(' ') + 1) + 1, response.find(' ', response.find(' ', response.find(' ') + 1) + 1));
     std::string max_errors = response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length());
@@ -202,10 +205,12 @@ std::string play_win_ok(std::string letter) {
 
 std::string play_aux_ok(const char* message, std::string letter) {
     std::string word_pos = message;
+    // TODO fix input splitting
     word_pos.pop_back();
     word_pos = word_pos.substr(word_pos.find(' ', word_pos.find(' ', word_pos.find(' ') + 1) + 1) + 1, word_pos.length());
 
     // split word_pos into two strings by the first space
+    // TODO fix input splitting
     std::string positions = word_pos.substr(word_pos.find(' ') + 1, word_pos.length());
 
     // transform word_pos into a vector of ints
@@ -311,7 +316,24 @@ int exit_game(std::string id, int fd, struct addrinfo *res) {
 
     send_message(fd, message.c_str(), message.length(), res);
 
+<<<<<<< Updated upstream
     // TODO server reply
+=======
+    receive_message(fd, addr, buffer, buf_size);
+
+    std::string response = buffer;
+    // remove all characters after the first \n
+    response = response.substr(0, response.find('\n') + 1);
+    const char* buf = response.c_str();
+
+    std::string status = get_status(buf);
+    // // printf("status: %s", status.c_str());
+    if (status.compare(OK) == 0) {
+        printf("GOODBYE :3\n");
+    } else {
+        printf("Player doesn't have an ongoing game or the connection wasn't properly closed.\n");
+    }
+>>>>>>> Stashed changes
 
     return 0;
 }
