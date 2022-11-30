@@ -24,6 +24,7 @@ Mateus Pinho - ist199282
 #include <unistd.h>
 #include <iostream>
 #include <vector>
+#include <fstream>
 
 /* Global variables */
 int move_number = 1;
@@ -320,7 +321,7 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     return 0;
 }
 
-std::string scoreboard_aux_ok(const char* message) {
+void scoreboard_aux_ok(const char* message) {
     // split the string into two strings after the first space
     std::string scoreboard = message;
     scoreboard = scoreboard.substr(scoreboard.find(' ', scoreboard.find(' ') + 1) + 1, scoreboard.length());
@@ -328,13 +329,15 @@ std::string scoreboard_aux_ok(const char* message) {
     // scoreboard until the first space is file name
     std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
     // file_size is between the first space and the first space
-    printf("file_name: %s\n", file_name.c_str());
     auto file_size = scoreboard.erase(0, file_name.length() + 1);
     std::string file_size_str = file_size.substr(0, file_size.find(' '));
-    printf("file_size: %s\n", file_size_str.c_str());
     auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
-    printf("useful_info: %s\n", useful_info.c_str());
-    return "";
+    printf("SCOREBOARD:\n%s", useful_info.c_str());
+    
+    // create new file named file_name with file_size bytes and write useful_info into it
+    std::ofstream file(file_name);
+    file << useful_info;
+    file.close();
 }
 
 void scoreboard(const char* server_ip, const char* server_port) {
@@ -390,7 +393,7 @@ void scoreboard(const char* server_ip, const char* server_port) {
 
     std::string response = buffer;
     // remove all characters after the first \n
-    response = response.substr(0, response.find('\n'));
+    response = response.substr(0, response.find('\n') + 1);
     const char* buf = response.c_str();
 
     std::string status = get_status(buf);
