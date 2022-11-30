@@ -341,12 +341,11 @@ void scoreboard_aux_ok(const char* message) {
 }
 
 void scoreboard(const char* server_ip, const char* server_port) {
-    int fd, errorcode, n;
+    int fd, errorcode;
+    ssize_t n;
     struct addrinfo hints, *res;
-    struct sockaddr_in addr;
     std::string buffer;
     char byte[1];
-    size_t buf_size = BLOCK_SIZE;
     std::string message = "GSB\n";
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
