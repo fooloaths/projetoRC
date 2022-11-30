@@ -10,7 +10,7 @@ Gonçalo Nunes - ist199229
 Mateus Pinho - ist199282
 */
 
-#include "hangman_server.hpp"
+#include "hangman-server.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -35,8 +35,8 @@ Mateus Pinho - ist199282
 
 // TODO don't add \n from hint to file
 // TODO check if ID is already in use
-// TODO 10 mágico na FindTopScore???
-// TODO quando recebemos certos comandos, temos de ver se há um jogo ativo para esse PLID
+// TODO 10 magico na FindTopScore???
+// TODO quando recebemos certos comandos, temos de ver se ha um jogo ativo para esse PLID
 // TODO maybe delete server init
 
 #define NUMBER_THREADS 16
@@ -50,10 +50,20 @@ Mateus Pinho - ist199282
 int server_init();
 int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res);
 struct request* process_input(char buffer[]);
-std::string get_random_word_from_file();
+struct game* get_active_game(std::string PLID);
+void create_game_session(std::string word, char moves, std::string PLID, std::string hint);
+std::string get_random_line_from_file();
+void create_active_game_file(std::string game, struct request *req);
+std::string get_word(std::string line);
+std::string get_hint(std::string line);
 int treat_request(int fd, struct addrinfo *res, struct request *req);
 void treat_start(int fd, struct addrinfo *res, struct request *req);
 void treat_guess(int fd, struct addrinfo *res, struct request *req);
+void record_move_for_active_game(struct request *req);
+int compare_plays(struct request *req, std::string line);
+int get_move_number(struct request *req);
+char* get_word_and_hint(struct request *req);
+int check_for_active_game(struct request *req);
 int FindLastGame(char *PLID, char *fname);
 /*int FindTopScores(SCORELIST ∗list)*/
 
@@ -69,6 +79,7 @@ struct game {
     std::string word;
     std::string max_errors;
     std::string move_number;
+    std::string hint_file;  // TODO meter o hint file aqui durante o treat request
 };
 
 std::vector<int> session_ids;
@@ -79,7 +90,6 @@ std::unordered_map<std::string, struct game*> active_games; // Key should be a P
 
 
 int main(int argc, char **argv) {
-    FILE *fserv;
 
     int fd, errorcode;
     ssize_t n;
@@ -230,13 +240,13 @@ struct request* process_input(char buffer[]) {
     return req;
 }
 
-std::string get_random_word_from_file() {
+std::string get_random_line_from_file() {
     int line = rand() % NUMBER_OF_WORDS;
 
     int line_num = 1;
     char *buffer = (char *) malloc(WORLD_LINE_SIZE * sizeof(char));
     if (buffer == NULL) {
-        printf("Error (get_word_from_file): Ran out of memory\n");
+        printf("Error (get_random_line_from_file): Ran out of memory\n");
     }
 
     size_t buf_size = WORLD_LINE_SIZE;
@@ -248,16 +258,7 @@ std::string get_random_word_from_file() {
         }
         memset(buffer, '\0', WORLD_LINE_SIZE);
     }
-
-    /* Extract word from file */
-    int i = 0;
-    std::string output;
-    while (buffer[i] != ' ') {
-        output.push_back(buffer[i]);
-        i++;
-    }
-
-    return output;
+    return buffer;
 }
 
 int treat_request(int fd, struct addrinfo *res, struct request *req) {
@@ -276,7 +277,7 @@ int treat_request(int fd, struct addrinfo *res, struct request *req) {
     return 0;
 }
 
-void create_game_session(std::string word, char moves, std::string PLID) {
+void create_game_session(std::string word, char moves, std::string PLID, std::string hint) {
     struct game *new_game = (struct game *) malloc(sizeof(struct game));
     if (new_game == NULL) {
         printf("Error (create_game_session): Ran out of memory\n");
@@ -287,6 +288,7 @@ void create_game_session(std::string word, char moves, std::string PLID) {
     new_game->PLID = PLID;
     new_game->max_errors = moves;
     new_game->move_number = "1";
+    new_game->hint_file = hint;
     
     /* Add it to active games hashmap */
     active_games[PLID] = new_game;
@@ -303,7 +305,9 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
     if (found == 0) {
         /* No active game found for player PLID */
         status = OK;
-        std::string word = get_random_word_from_file();
+        std::string line = get_random_line_from_file();
+        std::string word = get_word(line);
+        std::string hint = get_hint(line);
         char moves;
         suffix = suffix + std::to_string(word.length());
         if (word.length() <= 6) {
@@ -316,6 +320,8 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
             moves = '9';
         }
         suffix.push_back(' '); suffix.push_back(moves);
+        create_active_game_file(line, req);
+        //create_game_session(word, moves, req->PLID, hint);
     }
     else {
         status = NOK;
@@ -339,7 +345,7 @@ std::string get_first_line_from_game_file(struct request *req) {
     }
 
     /* Store path to file on fname */
-    sprintf(fname, "GAMES/GAME_%s.txt", req->PLID);
+    sprintf(fname, "GAMES/GAME_%s.txt", (req->PLID).c_str());
     
     /* Allocate memory for string that will store first line from file */
     char *buffer = (char *) malloc(WORLD_LINE_SIZE * sizeof(char));
@@ -354,37 +360,64 @@ std::string get_first_line_from_game_file(struct request *req) {
     /* Get first line from file */
     getline(&buffer, &buf_size, fp);
 
-    return buffer;
+    return buffer; // TODO dar free algures
 }
 
-std::string get_word(struct request *req) {
-    std::string line = get_first_line_from_game_file(req);
+std::string get_word(std::string line) {
+    int i = 0;
 
-    return strtok(&line[0], " ");
+    std::string output;
+    while (line[i] != ' ') {
+        output.push_back(line[i]);
+        i++;
+    }
+    return output;
 }
 
-std::string get_hint_file_name(struct request *req) {
-    std::string line = get_first_line_from_game_file(req);
+std::string get_hint(std::string line) {
+    int i = 0;
 
+    std::string output;
+    /* Skip word */
+    while (line[i] != ' ') {i++;}
+    i++;
 
-    std::string token = strtok(&line[0], " ");
-    token = strtok(NULL, " ");
+    while (line[i] != '\0') {
+        output.push_back(line[i]);
+        i++;
+    }
 
-    return token;
+    return output;
 }
-
 
 void treat_guess(int fd, struct addrinfo *res, struct request *req) {
     /* Look for active games with req->PLID */
-
-    /* Get word and number of moves */
-    std::string real_word = get_word(req);
+    if (check_for_active_game(req) == -1) {
+        /* No active game for req->PLID */
+        // TODO send corresponding reply to client
+    }
 
     /* Compare number of moves to req->trials */
+    int move_number = get_move_number(req);
+    if (std::stoi(req->trial) != move_number) {
+        /* Send message to client saying something went wrong */
+        // TODO implement
+    }
 
     /* Compare res->word to the word */
+    char *line = get_word_and_hint(req);
+    std::string word = get_word(line);
+    free(line);
 
-    /* Reply to client */
+    if (word == req->letter_word) {
+        /* Send reply to client */
+        // TODO implement
+    }
+    else {
+        /* Send reply to client */
+        // TODO implement
+    }
+
 }
 
 int FindLastGame(char *PLID, char *fname) {
@@ -415,6 +448,7 @@ int FindLastGame(char *PLID, char *fname) {
 
     return (found);
 }
+
 
 /*int FindTopScores(SCORELIST ∗list) {
     struct dirent **filelist;
@@ -461,4 +495,159 @@ int server_init() {
     }
 
     return 0;
+}
+
+void create_active_game_file(std::string game, struct request *req) {
+    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+
+    /* Create and open file */
+    std::ofstream file(file_path);
+
+    /* Write first line to file */
+    file << game;
+
+    /* Close file */
+    file.close();
+}
+
+/* Returns 0 if file exists, -1 otherwise */
+int check_for_active_game(struct request *req) {
+    std::string filepath = ACTIVE_GAME_PATH + req->PLID + ".txt";
+
+    /* Check if file exists */
+    if (access(filepath.c_str(), F_OK) == 0) {
+        /* It exists */
+        return 0;
+    }
+    else {
+        /* It doesn't exist. Very sad */
+        return -1;
+    }
+}
+
+void record_move_for_active_game(struct request *req) {
+    std::ofstream file;
+
+    /* Open file */
+    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+    file.open(file_path, std::ios_base::app);
+
+    /* Check for errors */
+    if (file.fail()) {
+        printf("Error (record_move_for_active_game): Failed to open game file.\n");
+    }
+
+    /* Append new line */
+    std::string line;
+    if (req->op_code == "PLG") {
+        line = T;
+    }
+    else {
+        line = G;
+    }
+    line = line + " " + req->letter_word;
+    file << line;
+
+    /* Close file */
+    file.close();
+}
+
+int get_move_number(struct request *req) {
+    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+
+    /* Open file for reading */
+    FILE *file;
+    file = fopen(file_path.c_str(), "r");
+    if (file == NULL) {
+        printf("Error (get_move_number): Failed to open file.\n");
+    }
+
+
+    /* Read */
+    char *line = (char *) malloc(LINE_SIZE * sizeof(char));
+    int line_num = 0;
+    size_t buf_size = LINE_SIZE;
+    while (getline(&line, &buf_size, file) != -1) {
+        line_num++;
+    }
+
+    fclose(file);
+    free(line);
+
+    return line_num;
+}
+
+/* Returns 0 for duplicate moves and -1 otherwise */
+int check_for_duplicate_move(struct request *req) {
+    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+
+    /* Open file for reading */
+    FILE *file;
+
+    file = fopen(file_path.c_str(), "r");
+    if (file == NULL) {
+        printf("Error (check_for_duplicate_move): Couldn't open file.\n");
+    }
+
+    /* Read */
+    char *line = (char *) malloc(LINE_SIZE * sizeof(char));
+    memset(line, '\0', LINE_SIZE);
+    size_t buf_size = LINE_SIZE;
+    while (getline(&line, &buf_size, file) != -1) {
+        if (compare_plays(req, line) == 0) {
+            return 0;
+        }
+        memset(line, '\0', LINE_SIZE);
+    }
+
+    fclose(file);
+    free(line);
+
+    return -1;
+}
+
+/* Returns 0 for identical plays and -1 for different plays */
+int compare_plays(struct request *req, std::string line) {
+    
+    if ((req->op_code == "PLG" && line.front() == 'G') || 
+        (req->op_code == "PWG" && line.front() == 'T')) {
+            /* If type of move is different */
+            return -1;
+    }
+    
+    int i = 0;
+    while (line[i] != ' ') {i++;} // Skip code
+    i++; // Skip space
+
+    std::string word;
+    while (line[i] != '\0' || line[i] != '\n') {
+        word.push_back(line[i]);
+        i++;
+    }
+
+    if (word == req->letter_word) {
+        return 0;
+    }
+    
+    return -1;
+}
+
+char* get_word_and_hint(struct request *req) {
+    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+
+    /* Open file for reading */
+    FILE *file;
+
+    file = fopen(file_path.c_str(), "r");
+    if (file == NULL) {
+        printf("Error (check_for_duplicate_move): Couldn't open file.\n");
+    }
+
+    /* Read */
+    char *line = (char *) malloc(LINE_SIZE * sizeof(char));
+    memset(line, '\0', LINE_SIZE);
+    size_t buf_size = LINE_SIZE;
+    getline(&line, &buf_size, file);
+
+    return line; // TODO lembrar de dar free algures
 }
