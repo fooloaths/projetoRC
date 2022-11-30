@@ -24,6 +24,7 @@ Mateus Pinho - ist199282
 #include <unistd.h>
 #include <iostream>
 #include <vector>
+#include <fstream>
 
 /* Global variables */
 int move_number = 1;
@@ -38,6 +39,7 @@ std::string get_status(std::string message);
 std::string play_aux_ok(const char* message, std::string letter);
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in add);
 std::string format_word(std::string word_to_format = word);
+void scoreboard(const char* server_ip, const char* server_port);
 int guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in addr);
 
 int main(int argc, char *argv[]) {
@@ -91,6 +93,8 @@ int main(int argc, char *argv[]) {
         } else if (command == GUESS || command == GW) {
             // TODO CHECK NUMBER OF MOVES
             guess(message, fd, res, addr);
+        } else if (command == SCOREBOARD || command == SB) {
+            scoreboard(server_ip, server_port);
         } else {
             printf("Input Error: Invalid command.\n");
         }
@@ -316,6 +320,92 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     }
     return 0;
 }
+
+void scoreboard_aux_ok(const char* message) {
+    // split the string into two strings after the first space
+    std::string scoreboard = message;
+    scoreboard = scoreboard.substr(scoreboard.find(' ', scoreboard.find(' ') + 1) + 1, scoreboard.length());
+
+    // scoreboard until the first space is file name
+    std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
+    // file_size is between the first space and the first space
+    auto file_size = scoreboard.erase(0, file_name.length() + 1);
+    std::string file_size_str = file_size.substr(0, file_size.find(' '));
+    auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
+    printf("SCOREBOARD:\n%s", useful_info.c_str());
+    
+    // create new file named file_name with file_size bytes and write useful_info into it
+    std::ofstream file(file_name);
+    file << useful_info;
+    file.close();
+}
+
+void scoreboard(const char* server_ip, const char* server_port) {
+    int fd, errorcode;
+    ssize_t n;
+    struct addrinfo hints, *res;
+    std::string buffer;
+    char byte[1];
+    std::string message = "GSB\n";
+
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1) {
+        close(fd);
+        exit(1);
+    }
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    errorcode = getaddrinfo(server_ip, server_port, &hints, &res);
+    if (errorcode != 0) {
+        freeaddrinfo(res);
+        close(fd);
+        exit(1);
+    }
+
+    n = connect(fd, res->ai_addr, res->ai_addrlen);
+    if (n == -1) {
+        freeaddrinfo(res);
+        close(fd);
+        exit(1);
+    }
+
+    n = write(fd, message.c_str(), message.length());
+    if (n == -1) {
+        freeaddrinfo(res);
+        close(fd);
+        exit(1);
+    }
+
+    // read byte by byte until \n
+    while (byte[0] != '\n') {
+        n = read(fd, byte, 1);
+        if (n == -1) {
+            freeaddrinfo(res);
+            close(fd);
+            exit(1);
+        }
+        buffer.push_back(byte[0]);
+    }
+
+    std::string response = buffer;
+    // remove all characters after the first \n
+    response = response.substr(0, response.find('\n') + 1);
+    const char* buf = response.c_str();
+
+    std::string status = get_status(buf);
+    if (status.compare(OK) == 0) {
+        scoreboard_aux_ok(buf);
+    } else {
+        printf("The scoreboard is empty!\n");
+    }
+    
+    freeaddrinfo(res);
+    close(fd);
+}
+
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     char buffer[BLOCK_SIZE];
     size_t buf_size = BLOCK_SIZE;
