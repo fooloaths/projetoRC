@@ -33,7 +33,7 @@ std::string word = "";
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 void receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
 void send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
-int exit_game(std::string id, int fd, struct addrinfo *res);
+int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 std::string get_status(std::string message);
 std::string play_aux_ok(const char* message, std::string letter);
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in add);
@@ -83,10 +83,10 @@ int main(int argc, char *argv[]) {
         } else if (command == PLAY || command == PL) {
             // TODO CHECK NUMBER OF MOVES
             play(message, fd, res, addr);
-        } else if (command == QUIT) {
-            exit_game(message, fd, res);
-        } else if (command == EXIT) {
-            exit_game(message, fd, res);
+        } else if (command == "quit") {
+            exit_game(message, fd, res, addr);
+        } else if (command == "exit") {
+            exit_game(message, fd, res, addr);
             break;
         } else if (command == GUESS || command == GW) {
             // TODO CHECK NUMBER OF MOVES
@@ -164,8 +164,13 @@ std::string get_status(std::string message) {
     size_t i = 4; // Skip reply signature (RLG) and space
 
     std::string status;
-    while (message[i] != ' ') {
-        status.push_back(message[(size_t)i]);
+    // take off \n if it exists
+    if (message[message.length() - 1] == '\n') {
+        message.pop_back();
+    }
+    // split message from i = 4 to the first space
+    while (message[i] != ' ' && i < message.length()) {
+        status.push_back(message[i]);
         i++;
     }
 
@@ -255,7 +260,8 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
     std::string status = get_status(buf);
     move_number++;
     if (status.compare(WIN) == 0) {
-        printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", format_word(guess_word).c_str());
+        printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", 
+        guess_word.c_str());
     } else if (status.compare(NOK) == 0) {
         printf("YOU ARE WRONG!!!\n");
     } else if (status.compare(OVR) == 0) {
@@ -294,7 +300,7 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
         printf("YOU ARE RIGHT!!! THE WORD NOW IS %s\n", format_word().c_str());
     } else if (status.compare(WIN) == 0) {
         word = play_win_ok(letter);
-        printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", format_word().c_str());
+        printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", word.c_str());
     } else if (status.compare(DUP) == 0) {
         printf("YOU ALREADY TRIED THIS LETTER!!!\n");
         move_number--;
@@ -310,15 +316,12 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     }
     return 0;
 }
-
-int exit_game(std::string id, int fd, struct addrinfo *res) {
-    std::string message = QUT + id + '\n';
+int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
+    char buffer[BLOCK_SIZE];
+    size_t buf_size = BLOCK_SIZE;
+    std::string message = "QUT " + id + '\n';
 
     send_message(fd, message.c_str(), message.length(), res);
-
-<<<<<<< Updated upstream
-    // TODO server reply
-=======
     receive_message(fd, addr, buffer, buf_size);
 
     std::string response = buffer;
@@ -333,7 +336,6 @@ int exit_game(std::string id, int fd, struct addrinfo *res) {
     } else {
         printf("Player doesn't have an ongoing game or the connection wasn't properly closed.\n");
     }
->>>>>>> Stashed changes
 
     return 0;
 }
