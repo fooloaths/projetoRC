@@ -161,8 +161,13 @@ std::string get_status(std::string message) {
     size_t i = 4; // Skip reply signature (RLG) and space
 
     std::string status;
-    while (message[i] != ' ' || message[i] != '\n' || message[i] != '\0') {
-        status.push_back(message[(size_t)i]);
+    // take off \n if it exists
+    if (message[message.length() - 1] == '\n') {
+        message.pop_back();
+    }
+    // split message from i = 4 to the first space
+    while (message[i] != ' ' && i < message.length()) {
+        status.push_back(message[i]);
         i++;
     }
 
@@ -322,7 +327,7 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
     const char* buf = response.c_str();
 
     std::string status = get_status(buf);
-    printf("status: %s", status.c_str());
+    // // printf("status: %s", status.c_str());
     if (status.compare(OK) == 0) {
         printf("GOODBYE!!!\n");
     } else {
