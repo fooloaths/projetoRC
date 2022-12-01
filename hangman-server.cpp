@@ -38,6 +38,7 @@ Mateus Pinho - ist199282
 // TODO 10 magico na FindTopScore???
 // TODO quando recebemos certos comandos, temos de ver se ha um jogo ativo para esse PLID
 // TODO maybe delete server init
+// TODO if receive same play/guess twice, assume client didn't receive first reply and repeat the move (just don't store on the file)
 
 #define NUMBER_THREADS 16
 #define BLOCK_SIZE 256
@@ -56,6 +57,7 @@ std::string get_random_line_from_file();
 void create_active_game_file(std::string game, struct request *req);
 std::string get_word(std::string line);
 std::string get_hint(std::string line);
+std::string max_tries(std::string word);
 int treat_request(int fd, struct addrinfo *res, struct request *req);
 void treat_start(int fd, struct addrinfo *res, struct request *req);
 void treat_guess(int fd, struct addrinfo *res, struct request *req);
@@ -240,6 +242,22 @@ struct request* process_input(char buffer[]) {
     return req;
 }
 
+int valid_PLID(std::string PLID) {
+    if (PLID.length() != 6) {
+        return -1;
+    }
+
+    int i = 0;
+    while (PLID[i] != '\0' || PLID[i] != '\n') {
+        if (PLID[i] < '0' || PLID[i] > '9') {
+            return -1;
+        }
+        i++;
+    }
+
+    return 0;
+}
+
 std::string get_random_line_from_file() {
     int line = rand() % NUMBER_OF_WORDS;
 
@@ -262,6 +280,7 @@ std::string get_random_line_from_file() {
 }
 
 int treat_request(int fd, struct addrinfo *res, struct request *req) {
+
     if (req->op_code == SNG) {
         /* Start New Game */
         treat_start(fd, res, req);
@@ -308,18 +327,10 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
         std::string line = get_random_line_from_file();
         std::string word = get_word(line);
         std::string hint = get_hint(line);
-        char moves;
+        //char moves;
         suffix = suffix + std::to_string(word.length());
-        if (word.length() <= 6) {
-            moves = '7';
-        }
-        else if (word.length() <= 10) {
-            moves = '8';
-        }
-        else {
-            moves = '9';
-        }
-        suffix.push_back(' '); suffix.push_back(moves);
+        std::string moves = max_tries(moves);
+        suffix.push_back(' '); suffix.push_back(moves.front());
         create_active_game_file(line, req);
         //create_game_session(word, moves, req->PLID, hint);
     }
@@ -332,6 +343,20 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
     }
 
     send_message(fd, message.c_str(), message.length(), res);
+}
+
+std::string max_tries(std::string word) {
+    std::string moves;
+        if (word.length() <= 6) {
+            moves = '7';
+        }
+        else if (word.length() <= 10) {
+            moves = '8';
+        }
+        else {
+            moves = '9';
+        }
+    return moves;
 }
 
 std::string get_first_line_from_game_file(struct request *req) {
@@ -391,17 +416,24 @@ std::string get_hint(std::string line) {
 }
 
 void treat_guess(int fd, struct addrinfo *res, struct request *req) {
+    std::string message = RLG;
+    message.push_back(' ');
+
     /* Look for active games with req->PLID */
-    if (check_for_active_game(req) == -1) {
+    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) { // TODO also need to send ERR in some other cases
         /* No active game for req->PLID */
-        // TODO send corresponding reply to client
+        message = message + ERR + "\n";
+        send_message(fd, message.c_str(), message.length(), res);
     }
 
     /* Compare number of moves to req->trials */
     int move_number = get_move_number(req);
+    std::string moves = std::to_string(' ') + std::to_string(move_number) + "\n";
     if (std::stoi(req->trial) != move_number) {
         /* Send message to client saying something went wrong */
-        // TODO implement
+        // TODO if duplicate guess, also reply INV
+        message = message + INV + moves;
+        send_message(fd, message.c_str(), message.length(), res);
     }
 
     /* Compare res->word to the word */
@@ -409,13 +441,20 @@ void treat_guess(int fd, struct addrinfo *res, struct request *req) {
     std::string word = get_word(line);
     free(line);
 
-    if (word == req->letter_word) {
+    if (word == req->letter_word) { // Won the game
         /* Send reply to client */
-        // TODO implement
+        message = message + WIN + moves;
+        send_message(fd, message.c_str(), message.length(), res);
     }
-    else {
+    else if (req->trial == max_tries(word)) { // No more errors
         /* Send reply to client */
-        // TODO implement
+        message = message + OVR + moves;
+        send_message(fd, message.c_str(), message.length(), res);
+    }
+    else { // Incorrect guess, but with remaining attempts
+        /* Send reply to client */
+        message = message + NOK + moves;
+        send_message(fd, message.c_str(), message.length(), res);
     }
 
 }
@@ -565,8 +604,10 @@ int get_move_number(struct request *req) {
 
     /* Read */
     char *line = (char *) malloc(LINE_SIZE * sizeof(char));
-    int line_num = 0;
+    int line_num = 1;
     size_t buf_size = LINE_SIZE;
+
+    getline(&line, &buf_size, file); // Skip first line
     while (getline(&line, &buf_size, file) != -1) {
         line_num++;
     }
