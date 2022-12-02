@@ -789,10 +789,8 @@ void treat_quit(int fd, struct addrinfo *res, struct request *req) {
 
         std::string file_name = SCORES + get_current_date_and_time() + "_" + Q + ".txt";
         std::string current_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
-        char *shell_command = (char *) malloc(sizeof(char) * (4 + file_name.length() + current_path.length()));
-        sprintf(shell_command, "mv %s %s", current_path, file_name);
-        system(shell_command);
-        free(shell_command);
+        std::string shell_command = "mv " + current_path + " " + file_name;
+        system(shell_command.c_str());
 
         status = OK;
     }
