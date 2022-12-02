@@ -10,7 +10,7 @@ Gonçalo Nunes - ist199229
 Mateus Pinho - ist199282
 */
 
-#include "hangman-server.hpp"
+#include "hangman_server.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -31,7 +31,7 @@ Mateus Pinho - ist199282
 #include <signal.h>
 #include <iostream>
 #include <fstream>
-#include <unordered_map>
+#include <time.h>
 
 // TODO don't add \n from hint to file
 // TODO check if ID is already in use
@@ -45,7 +45,7 @@ Mateus Pinho - ist199282
 #define PORT "58000"
 #define GAME_NAME 15
 #define SEED 73
-#define NUMBER_OF_WORDS 6
+#define NUMBER_OF_WORDS 6       // TODO algumas destas constantes foram tiradas do rabo
 #define WORLD_LINE_SIZE 64
 
 int server_init();
@@ -61,11 +61,13 @@ std::string max_tries(std::string word);
 int treat_request(int fd, struct addrinfo *res, struct request *req);
 void treat_start(int fd, struct addrinfo *res, struct request *req);
 void treat_guess(int fd, struct addrinfo *res, struct request *req);
+void treat_quit(int fd, struct addrinfo *res, struct request *req);
 void record_move_for_active_game(struct request *req);
 int compare_plays(struct request *req, std::string line);
 int get_move_number(struct request *req);
 char* get_word_and_hint(struct request *req);
 int check_for_active_game(struct request *req);
+std::string get_current_date_and_time();
 int FindLastGame(char *PLID, char *fname);
 /*int FindTopScores(SCORELIST ∗list)*/
 
@@ -88,7 +90,6 @@ std::vector<int> session_ids;
 static pthread_mutex_t id_table_mutex;
 std::string word_file = "word_file";
 FILE* fp_word_file;
-std::unordered_map<std::string, struct game*> active_games; // Key should be a PLID
 
 
 int main(int argc, char **argv) {
@@ -130,6 +131,13 @@ int main(int argc, char **argv) {
             exit(1);
         }
         fp_word_file = fopen("word_file", "r");
+        if (fp_word_file == NULL) {
+            printf("Error (main): Couldn't open word file.\n");
+            if (errno == EACCES) {
+                printf("    EACCES: Not enough permissions to open file\n");
+            }
+            return -1; // TODO close socket
+        }
         srand(SEED); /* Set seed for random num generator */
     }
     else {
@@ -255,6 +263,11 @@ int valid_PLID(std::string PLID) {
         i++;
     }
 
+    if (PLID[0] > '1') {
+        /* First digit must be 0 or 1 */
+        return -1;
+    }
+
     return 0;
 }
 
@@ -292,26 +305,35 @@ int treat_request(int fd, struct addrinfo *res, struct request *req) {
         /* Guess Word */
         treat_guess(fd, res, req);
     }
+    else if (req->op_code == QUT) {
+        /* Close game session, if one exists */
+        treat_quit(fd, res, req);
+    }
+    else {
+        /* Invalid protocol message */
+        std::string message = ERR + '\n'; // TODO see if other parts of req are invalid
+        send_message(fd, message.c_str(), message.length(), res);
+    }
 
     return 0;
 }
 
-void create_game_session(std::string word, char moves, std::string PLID, std::string hint) {
-    struct game *new_game = (struct game *) malloc(sizeof(struct game));
-    if (new_game == NULL) {
-        printf("Error (create_game_session): Ran out of memory\n");
-    }
-
-    /* Initialize game struct */
-    new_game->word = word;
-    new_game->PLID = PLID;
-    new_game->max_errors = moves;
-    new_game->move_number = "1";
-    new_game->hint_file = hint;
-    
-    /* Add it to active games hashmap */
-    active_games[PLID] = new_game;
-}
+//void create_game_session(std::string word, char moves, std::string PLID, std::string hint) {
+//    struct game *new_game = (struct game *) malloc(sizeof(struct game));
+//   if (new_game == NULL) {
+//        printf("Error (create_game_session): Ran out of memory\n");
+//    }
+//
+//    /* Initialize game struct */
+//    new_game->word = word;
+//    new_game->PLID = PLID;
+//    new_game->max_errors = moves;
+//    new_game->move_number = "1";
+//    new_game->hint_file = hint;
+//    
+//    /* Add it to active games hashmap */
+//    active_games[PLID] = new_game;
+//}
 
 void treat_start(int fd, struct addrinfo *res, struct request *req) {
     char* fname = (char *) malloc(GAME_NAME * sizeof(char));
@@ -564,6 +586,36 @@ int check_for_active_game(struct request *req) {
     }
 }
 
+/* Returns 0 if dir is a valid directory, -1 otherwise */
+int is_directory(std::string dir) {
+
+    if (dir.length() < 1) {
+        /* Invalid Input */
+        printf("Error (is_directory): Received empty string, instead of a directory\n");
+        return -1;
+    }
+
+    DIR *directory = opendir(dir.c_str());
+
+    if (errno == ENOENT || errno == ENOTDIR) {
+        /* No such directory */
+        return -1;
+    }
+    else if (errno == EACCES) {
+        printf("Error (is_directory): Directory exists, but permission to open was not granted\n");
+        return -1;
+    }
+    else if (directory != NULL) {
+        /* Directory exists */
+        return 0;
+    }
+    else {
+        printf("Error (is_directory): Something went wrong while opening the directory\n");
+        return -1;
+    }
+
+}
+
 void record_move_for_active_game(struct request *req) {
     std::ofstream file;
 
@@ -599,6 +651,16 @@ int get_move_number(struct request *req) {
     file = fopen(file_path.c_str(), "r");
     if (file == NULL) {
         printf("Error (get_move_number): Failed to open file.\n");
+        if (errno == EACCES) {
+            printf("    EACCES: Not enough permissions to open file\n");
+        }
+        else if (errno == EFAULT) {
+            printf("    EFAULT: Outside accessible adress space\n");
+        }
+        else if (errno == ENOENT) {
+            printf("    ENOENT: A directory component in pathname does not exist or is a dangling symbolic link.\n");
+        }
+        return -1;
     }
 
 
@@ -628,6 +690,16 @@ int check_for_duplicate_move(struct request *req) {
     file = fopen(file_path.c_str(), "r");
     if (file == NULL) {
         printf("Error (check_for_duplicate_move): Couldn't open file.\n");
+        if (errno == EACCES) {
+            printf("    EACCES: Not enough permissions to open file\n");
+        }
+        else if (errno == EFAULT) {
+            printf("    EFAULT: Outside accessible adress space\n");
+        }
+        else if (errno == ENOENT) {
+            printf("    ENOENT: A directory component in pathname does not exist or is a dangling symbolic link.\n");
+        }
+        return -1;
     }
 
     /* Read */
@@ -681,7 +753,17 @@ char* get_word_and_hint(struct request *req) {
 
     file = fopen(file_path.c_str(), "r");
     if (file == NULL) {
-        printf("Error (check_for_duplicate_move): Couldn't open file.\n");
+        printf("Error (get_word_and_hint): Couldn't open file.\n");
+        if (errno == EACCES) {
+            printf("    EACCES: Not enough permissions to open file\n");
+        }
+        else if (errno == EFAULT) {
+            printf("    EFAULT: Outside accessible adress space\n");
+        }
+        else if (errno == ENOENT) {
+            printf("    ENOENT: A directory component in pathname does not exist or is a dangling symbolic link.\n");
+        }
+        return NULL;
     }
 
     /* Read */
@@ -691,4 +773,43 @@ char* get_word_and_hint(struct request *req) {
     getline(&line, &buf_size, file);
 
     return line; // TODO lembrar de dar free algures
+}
+
+
+void treat_quit(int fd, struct addrinfo *res, struct request *req) {
+
+    std::string message = RQT + std::to_string(' ');
+    std::string status;
+    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
+        /* No active game or invalid PLID */
+        status = ERR;
+    }
+    else {
+        /* Close game and move file to SCORES */
+
+        std::string file_name = SCORES + get_current_date_and_time() + "_" + Q + ".txt";
+        std::string current_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+        char *shell_command = (char *) malloc(sizeof(char) * (4 + file_name.length() + current_path.length()));
+        sprintf(shell_command, "mv %s %s", current_path, file_name);
+        system(shell_command);
+        free(shell_command);
+
+        status = OK;
+    }
+
+    /* Complete reply message */
+    message = message + status + "\n";
+
+    /* Send reply through UDP socket */
+    send_message(fd, message.c_str(), message.length(), res);
+}
+
+std::string get_current_date_and_time() {
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    std::string output = std::to_string(tm.tm_year) + std::to_string(tm.tm_mon) + std::to_string(tm.tm_mday) + "_";
+    output = output + std::to_string(tm.tm_hour) + std::to_string(tm.tm_min) + std::to_string(tm.tm_sec);
+
+    return output;
 }
