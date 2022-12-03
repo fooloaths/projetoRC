@@ -13,7 +13,10 @@
 #define SNG "SNG"
 #define PWG "PWG"
 #define RQT "RQT"
-#define Q "Q"
+#define RWG "RWG"
+#define Q 'Q'
+#define F 'F'
+#define W 'W'
 #define T "T"
 #define G "G"
 #define LINE_SIZE 32

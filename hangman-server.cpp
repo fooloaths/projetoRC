@@ -32,13 +32,12 @@ Mateus Pinho - ist199282
 #include <iostream>
 #include <fstream>
 #include <time.h>
+#include <unordered_map>
 
 // TODO don't add \n from hint to file
 // TODO check if ID is already in use
-// TODO 10 magico na FindTopScore???
-// TODO quando recebemos certos comandos, temos de ver se ha um jogo ativo para esse PLID
-// TODO maybe delete server init
 // TODO if receive same play/guess twice, assume client didn't receive first reply and repeat the move (just don't store on the file)
+// TODO check for unused variables
 
 #define NUMBER_THREADS 16
 #define BLOCK_SIZE 256
@@ -48,10 +47,9 @@ Mateus Pinho - ist199282
 #define NUMBER_OF_WORDS 6       // TODO algumas destas constantes foram tiradas do rabo
 #define WORLD_LINE_SIZE 64
 
-int server_init();
+
 int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res);
 struct request* process_input(char buffer[]);
-struct game* get_active_game(std::string PLID);
 void create_game_session(std::string word, char moves, std::string PLID, std::string hint);
 std::string get_random_line_from_file();
 void create_active_game_file(std::string game, struct request *req);
@@ -62,12 +60,17 @@ int treat_request(int fd, struct addrinfo *res, struct request *req);
 void treat_start(int fd, struct addrinfo *res, struct request *req);
 void treat_guess(int fd, struct addrinfo *res, struct request *req);
 void treat_quit(int fd, struct addrinfo *res, struct request *req);
+void treat_play(int fd, struct addrinfo *res, struct request *req);
+std::string positions(char letter, std::string word);
 void record_move_for_active_game(struct request *req);
 int compare_plays(struct request *req, std::string line);
 int get_move_number(struct request *req);
 char* get_word_and_hint(struct request *req);
 int check_for_active_game(struct request *req);
 std::string get_current_date_and_time();
+void update_game(struct request *req);
+void move_to_SCORES(struct request *req, char code);
+int won_game(struct request *req);
 int FindLastGame(char *PLID, char *fname);
 /*int FindTopScores(SCORELIST ∗list)*/
 
@@ -84,10 +87,11 @@ struct game {
     std::string max_errors;
     std::string move_number;
     std::string hint_file;  // TODO meter o hint file aqui durante o treat request
+    std::string word_knowledge;
 };
 
-std::vector<int> session_ids;
-static pthread_mutex_t id_table_mutex;
+
+std::unordered_map<std::string, struct game*> active_games;
 std::string word_file = "word_file";
 FILE* fp_word_file;
 
@@ -110,11 +114,6 @@ int main(int argc, char **argv) {
     }
 
     printf("Starting hangman game server\n");
-
-    if (server_init() == -1) {
-        printf("Error (main): An error occured while initializing the server\n");
-        return -1;
-    }
 
     memset(&act, 0,sizeof(act));
     act.sa_handler = SIG_IGN;
@@ -142,6 +141,7 @@ int main(int argc, char **argv) {
     }
     else {
         /* TCP server */
+        exit(1); // TODO exit while it hasn't been implemented
     }
 
 
@@ -209,21 +209,29 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
 }
 
 
+/* Treat Start:
+    Receives a buffer containing what was read from the socket
+    
+    Parses information stored in buffer onto a struct request and returns
+    a pointer to that struct */
 struct request* process_input(char buffer[]) {
     struct request *req = (struct request *) malloc(sizeof(struct request));
     
+    /* Check if memory for the request was correctly allocated */
     if (req == NULL) {
         printf("Error (process_input): Ran out of memory while allocating space for the request\n");
         return NULL;
     }
 
     int i = 0;
+    /* Retrieve op code defining the requested functionality from the server */
     while (buffer[i] != ' ') {
         req->op_code.push_back(buffer[i]);
         i++;
     }
     i++;
 
+    /* Retrieve the player ID */
     while (buffer[i] != ' ' || buffer[i] != '\0') {
         req->PLID.push_back(buffer[i]);
         i++;
@@ -236,12 +244,14 @@ struct request* process_input(char buffer[]) {
         return req;
     }
 
+    /* Retrieve guessed letter or word */
     while (buffer[i] != ' ') {
         req->letter_word.push_back(buffer[i]);
         i++;
     }
     i++;
 
+    /* Retrieve current number of attempts */
     while (buffer[i] != '\0') {
         req->trial.push_back(buffer[i]);
         i++;
@@ -250,6 +260,11 @@ struct request* process_input(char buffer[]) {
     return req;
 }
 
+/* Valid PLID:
+
+    Checks if a string corresponds to a valid player ID.
+    
+    A */ // TODO finish documentation
 int valid_PLID(std::string PLID) {
     if (PLID.length() != 6) {
         return -1;
@@ -292,6 +307,13 @@ std::string get_random_line_from_file() {
     return buffer;
 }
 
+
+/* Treat Start:
+    Receives file descriptor for UDP socket, an addrinfo structure and a play
+    request.
+    
+    Checks the op_code associated with the request and calls the sub-routine
+    that implements that functionality */
 int treat_request(int fd, struct addrinfo *res, struct request *req) {
 
     if (req->op_code == SNG) {
@@ -318,23 +340,12 @@ int treat_request(int fd, struct addrinfo *res, struct request *req) {
     return 0;
 }
 
-//void create_game_session(std::string word, char moves, std::string PLID, std::string hint) {
-//    struct game *new_game = (struct game *) malloc(sizeof(struct game));
-//   if (new_game == NULL) {
-//        printf("Error (create_game_session): Ran out of memory\n");
-//    }
-//
-//    /* Initialize game struct */
-//    new_game->word = word;
-//    new_game->PLID = PLID;
-//    new_game->max_errors = moves;
-//    new_game->move_number = "1";
-//    new_game->hint_file = hint;
-//    
-//    /* Add it to active games hashmap */
-//    active_games[PLID] = new_game;
-//}
-
+/* Treat Start:
+    Receives file descriptor for UDP socket, an addrinfo structure and a play
+    request.
+    
+    If the client has not active game, a new one is started. 
+    Otherwise a NOK (Not OK) status message is send back to the client */
 void treat_start(int fd, struct addrinfo *res, struct request *req) {
     char* fname = (char *) malloc(GAME_NAME * sizeof(char));
     int found = FindLastGame(&req->PLID[0], fname);
@@ -349,12 +360,10 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
         std::string line = get_random_line_from_file();
         std::string word = get_word(line);
         std::string hint = get_hint(line);
-        //char moves;
         suffix = suffix + std::to_string(word.length());
         std::string moves = max_tries(moves);
         suffix.push_back(' '); suffix.push_back(moves.front());
         create_active_game_file(line, req);
-        //create_game_session(word, moves, req->PLID, hint);
     }
     else {
         status = NOK;
@@ -437,8 +446,25 @@ std::string get_hint(std::string line) {
     return output;
 }
 
+/* Treat Guess:
+    Receives file descriptor for UDP socket, an addrinfo structure and a play
+    request.
+    
+    If the client has an active game and a valid play request was given, 
+    checks if the guessed word matches the game word, updates the game 
+    accordingly and sends a reply:
+
+      - If player won: Close server side state of active game and move game
+      file to SCORES directory 
+      
+      - If play was unsuccessful with no more attempts:
+      End server side active game struct and move game file to corresponding
+      directories 
+      
+      - If play was unsuccessful with some attempts remaining:
+        Update game file */
 void treat_guess(int fd, struct addrinfo *res, struct request *req) {
-    std::string message = RLG;
+    std::string message = RWG;
     message.push_back(' ');
 
     /* Look for active games with req->PLID */
@@ -463,21 +489,29 @@ void treat_guess(int fd, struct addrinfo *res, struct request *req) {
     std::string word = get_word(line);
     free(line);
 
+    /* Write play to game file */
+    record_move_for_active_game(req);
+
     if (word == req->letter_word) { // Won the game
-        /* Send reply to client */
+        /* Prepare reply for client */
         message = message + WIN + moves;
-        send_message(fd, message.c_str(), message.length(), res);
+        move_to_SCORES(req, W);
+        // TODO move file completed GAMES subdir
     }
     else if (req->trial == max_tries(word)) { // No more errors
-        /* Send reply to client */
+        /* Prepare reply for client */
         message = message + OVR + moves;
-        send_message(fd, message.c_str(), message.length(), res);
+        move_to_SCORES(req, F);
     }
     else { // Incorrect guess, but with remaining attempts
-        /* Send reply to client */
+        /* Prepare reply for client */
         message = message + NOK + moves;
-        send_message(fd, message.c_str(), message.length(), res);
     }
+
+    /* Send reply to client */
+    send_message(fd, message.c_str(), message.length(), res);
+
+    // TODO atualizar game struct
 
 }
 
@@ -547,16 +581,6 @@ int FindLastGame(char *PLID, char *fname) {
     return (ifile);
 }*/
 
-
-int server_init() {
-
-    if (pthread_mutex_init(&id_table_mutex, NULL) != 0) {
-        printf("Error (server_init): Failed to create mutex for id table.\n");
-        return -1;
-    }
-
-    return 0;
-}
 
 void create_active_game_file(std::string game, struct request *req) {
     std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
@@ -775,7 +799,24 @@ char* get_word_and_hint(struct request *req) {
     return line; // TODO lembrar de dar free algures
 }
 
+void move_to_SCORES(struct request *req, char code) {
+    /* Code should be Q, F or W */
 
+    std::string file_name = SCORES + get_current_date_and_time() + "_" + code + ".txt";
+    std::string current_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+    std::string shell_command = "mv " + current_path + " " + file_name;
+    system(shell_command.c_str());
+
+}
+
+
+/* Treat Quit:
+    Receives file descriptor for UDP socket, an addrinfo structure and a play
+    request.
+    
+    If the client has an active game and a valid play request was given, 
+    any server side information regarding the active game is freed and 
+    the game file is moved */
 void treat_quit(int fd, struct addrinfo *res, struct request *req) {
 
     std::string message = RQT + std::to_string(' ');
@@ -787,10 +828,11 @@ void treat_quit(int fd, struct addrinfo *res, struct request *req) {
     else {
         /* Close game and move file to SCORES */
 
-        std::string file_name = SCORES + get_current_date_and_time() + "_" + Q + ".txt";
+        move_to_SCORES(req, Q);
+        /*std::string file_name = SCORES + get_current_date_and_time() + "_" + Q + ".txt";
         std::string current_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
         std::string shell_command = "mv " + current_path + " " + file_name;
-        system(shell_command.c_str());
+        system(shell_command.c_str());*/
 
         status = OK;
     }
@@ -810,4 +852,161 @@ std::string get_current_date_and_time() {
     output = output + std::to_string(tm.tm_hour) + std::to_string(tm.tm_min) + std::to_string(tm.tm_sec);
 
     return output;
+}
+
+
+/* Treat Play:
+    Receives file descriptor for UDP socket, an addrinfo structure and a play
+    request.
+    
+    If the client has an active game and a valid play request was given, 
+    performs the given play,updates the game accordingly and sends a reply:
+
+      - If player won: Close server side state of active game and move game
+      file to SCORES directory 
+      
+      - If play was successful: Update game file 
+      
+      - If play was unsuccessful with no more attempts:
+      End server side active game struct and move game file to corresponding
+      directories 
+      
+      - If play was unsuccessful with some attempts remaining:
+        Update game file */
+void treat_play(int fd, struct addrinfo *res, struct request *req) {
+    std::string message = RWG;
+    message.push_back(' ');
+
+    /* Look for active games with req->PLID */
+    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) { // TODO also need to send ERR in some other cases
+        /* No active game for req->PLID */
+        message = message + ERR + "\n";
+        send_message(fd, message.c_str(), message.length(), res);
+        return;
+    }
+
+    /* Compare number of moves to req->trials */
+    int move_number = get_move_number(req);
+    std::string moves = std::to_string(' ') + std::to_string(move_number) + "\n";
+    if (std::stoi(req->trial) != move_number) {
+        /* Send message to client saying something went wrong */
+        message = message + INV + moves;
+        send_message(fd, message.c_str(), message.length(), res);
+
+        // TODO analisar se aqui é para registar no ficheiro / incrementar erros
+    }
+
+    /* Compare res->word to the word */
+    char *line = get_word_and_hint(req);
+    std::string word = get_word(line);
+    free(line);
+
+    /* Write to play to file */
+    record_move_for_active_game(req);
+
+    if (!(positions((req->letter_word).front(), word).empty())) { // Some positions were found
+        /* Prepare reply for client and update game file */
+        update_game(req);
+        if (won_game(req)) {
+            /* Won the game */
+
+            message = message + WIN + "\n";
+            move_to_SCORES(req, W);
+
+            // TODO falta mudar para completed GAMES subdir
+        }
+        else {
+            /* Simply guessed a correct letter*/
+            message = message + OK + moves;
+            message.pop_back(); // Remove \n from moves
+            message = message + positions((req->letter_word).front(), word) + "\n";
+        }
+    }
+    else if (req->trial == max_tries(word)) { // No more errors
+        /* Prepare reply for client */
+        message = message + OVR + moves;
+        move_to_SCORES(req, F);
+
+        // TODO falta mudar para completed GAMES subdir
+    }
+    else { // Incorrect guess, but with remaining attempts
+        /* Prepare reply for client */
+        message = message + NOK + moves;
+    }
+    send_message(fd, message.c_str(), message.length(), res);
+
+
+    // TODO atualizar game struct
+}
+
+std::string positions(char letter, std::string word) {
+
+    std::string output;
+    int pos = 1;
+    int length = word.length();
+    for (int i = 0; i < length; i++) {
+        if (word[i] == letter) {
+            output.push_back(std::to_string(pos).front());
+            output.push_back(' ');
+        }
+        pos++;
+    }
+    if (output.empty()) {
+        return output;
+    }
+
+    /* Remove last space */
+    output.pop_back();
+
+    return output;
+}
+
+
+void create_game_session(std::string word, char moves, std::string PLID, std::string hint) {
+    struct game *new_game = (struct game *) malloc(sizeof(struct game));
+    if (new_game == NULL) {
+        printf("Error (create_game_session): Ran out of memory\n");
+    }
+
+    /* Initialize game struct */
+    new_game->word = word;
+    new_game->PLID = PLID;
+    new_game->max_errors = moves;
+    new_game->move_number = "1";
+    new_game->hint_file = hint;
+    
+    for (auto it = new_game->word.begin(); it != new_game->word.end(); it++) {
+        new_game->word_knowledge.push_back('_');
+    }
+    
+    /* Add it to active games hashmap */
+    //active_games[PLID] = new_game;
+    active_games.insert({PLID, new_game}); // TODO lembrar de dar pop quando o jogo acaba
+}
+
+void update_game(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    /* Update move number */
+    int moves = std::stoi(req->trial) + 1;
+    g->move_number = std::to_string(moves);
+    g->max_errors = moves;
+
+    int i = 0;
+    for (auto c: g->word) {
+        /* Iterate over word. If char i in word matches the guessed letter,
+            update current knowledge of the word */
+        if (c == req->letter_word.front()) {
+            g->word_knowledge[i] = req->letter_word.front();
+        }
+        i++;
+    }
+}
+
+int won_game(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    return g->word == g->word_knowledge;
 }
