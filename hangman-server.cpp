@@ -195,6 +195,9 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/* Send Message:
+
+    Sends message through a socket */
 int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res) {
     ssize_t n = sendto(fd, message, buf_size, 0, res->ai_addr, res->ai_addrlen);
 
@@ -264,12 +267,18 @@ struct request* process_input(char buffer[]) {
 
     Checks if a string corresponds to a valid player ID.
     
-    A */ // TODO finish documentation
+    A string is a valid player ID if and only if:
+     - It has size 6 
+     - All six of the characters are digits 
+     - The first (leftmost) digit is 0 or 1 */ // TODO finish documentation
 int valid_PLID(std::string PLID) {
+
+    /* Check string size */
     if (PLID.length() != 6) {
         return -1;
     }
 
+    /* Check that all characters in PLID are digits */
     int i = 0;
     while (PLID[i] != '\0' || PLID[i] != '\n') {
         if (PLID[i] < '0' || PLID[i] > '9') {
@@ -286,6 +295,17 @@ int valid_PLID(std::string PLID) {
     return 0;
 }
 
+
+/* Get Random Line From File:
+    
+    Picks a random line from the word file used and returns that line on a
+    dynamically allocated buffer. The line contains a word and the name of
+    the corresponding hint file
+    
+    Pseudo-randomness is implemented using rand() and computing the modulus
+    by NUMBER_OF_WORDS
+    
+    NUMBER_OF_WORDS is the number of lines on the word file */
 std::string get_random_line_from_file() {
     int line = rand() % NUMBER_OF_WORDS;
 
@@ -308,7 +328,7 @@ std::string get_random_line_from_file() {
 }
 
 
-/* Treat Start:
+/* Treat Request:
     Receives file descriptor for UDP socket, an addrinfo structure and a play
     request.
     
@@ -376,6 +396,10 @@ void treat_start(int fd, struct addrinfo *res, struct request *req) {
     send_message(fd, message.c_str(), message.length(), res);
 }
 
+/* Max Tries:
+
+    Receives a word and returns the maximum number of errors that can b made 
+    before losing the game. */
 std::string max_tries(std::string word) {
     std::string moves;
         if (word.length() <= 6) {
@@ -390,6 +414,15 @@ std::string max_tries(std::string word) {
     return moves;
 }
 
+/* Get First Line From Game File:
+    Receives a pointer to a struct request
+    
+    Opens the active game for the player who sent the request (req->PLID)
+    and returns the first line from the file.
+    
+    The first line on an active game file is of the type
+    <word> <hint_file>
+     */
 std::string get_first_line_from_game_file(struct request *req) {
 
     FILE *fp;
@@ -419,6 +452,9 @@ std::string get_first_line_from_game_file(struct request *req) {
     return buffer; // TODO dar free algures
 }
 
+/* Get Word:
+    Receives a string and returns the first word (all characters up to the
+    first space) */
 std::string get_word(std::string line) {
     int i = 0;
 
@@ -430,6 +466,8 @@ std::string get_word(std::string line) {
     return output;
 }
 
+/* Get Hint:
+    Receives a string and returns the second word */
 std::string get_hint(std::string line) {
     int i = 0;
 
@@ -581,7 +619,12 @@ int FindLastGame(char *PLID, char *fname) {
     return (ifile);
 }*/
 
-
+/* Create Active Game File: 
+    Receives the first line "game" for a new game file and a pointer to a struct request 
+    
+    First line: <word> <hint_file> 
+    
+    Creates and opens a new file with "game" as it's first line */
 void create_active_game_file(std::string game, struct request *req) {
     std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
 
@@ -640,6 +683,15 @@ int is_directory(std::string dir) {
 
 }
 
+/* Record Move For Active Game:
+    Receives a pointer to a struct request and appends a line describing the 
+    requested play to an active game file
+    
+    Besides the first line, all other lines are of the type
+    code play
+    
+    With code being either T (if the player sent a Play request) or G (if the
+    player sent a Guess request) and play being the letter or word guessed */
 void record_move_for_active_game(struct request *req) {
     std::ofstream file;
 
@@ -667,6 +719,11 @@ void record_move_for_active_game(struct request *req) {
     file.close();
 }
 
+/* Get Move Number:
+    
+    Opens an active game file for player req->PLID and counts the number of 
+    moves made (plays and guesses). The number of moves corresponds to the
+    number of lines in the file, excluding the first line */
 int get_move_number(struct request *req) {
     std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
 
@@ -799,6 +856,12 @@ char* get_word_and_hint(struct request *req) {
     return line; // TODO lembrar de dar free algures
 }
 
+/* Move to Scores:
+
+    Renames active game file for playe req->PLID to the format
+    YYYYMMDD_HHMMSS_code.txt
+    where code is either W (win), F (Fail) or Q (Quit) and moves it 
+    to the SCORES/ directory */
 void move_to_SCORES(struct request *req, char code) {
     /* Code should be Q, F or W */
 
@@ -844,6 +907,10 @@ void treat_quit(int fd, struct addrinfo *res, struct request *req) {
     send_message(fd, message.c_str(), message.length(), res);
 }
 
+/* Get Current Date and Time:
+
+    Returns current date and time in the format
+    YYYYMMDD_HHMMSS */
 std::string get_current_date_and_time() {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
@@ -939,6 +1006,8 @@ void treat_play(int fd, struct addrinfo *res, struct request *req) {
     // TODO atualizar game struct
 }
 
+/* Positions:
+    Returns the positions in "word" where the character "letter" appears */
 std::string positions(char letter, std::string word) {
 
     std::string output;
@@ -1004,6 +1073,8 @@ void update_game(struct request *req) {
     }
 }
 
+/* Won Game:
+    Checks if the player (req->PLID) has won the game */
 int won_game(struct request *req) {
     auto it = active_games.find(req->PLID); // Gets iterator pointing to game
     struct game *g = it->second;
