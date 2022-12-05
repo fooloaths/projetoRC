@@ -30,4 +30,6 @@
 #define OVR "OVR"
 #define INV "INV"
 #define ERR "ERR"
+#define REV "REV "
+#define rev "rev "
 #define VICTORY_MESSAGE "WELL DONE! You guessed: "
