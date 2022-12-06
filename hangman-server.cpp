@@ -135,7 +135,11 @@ int main(int argc, char **argv) {
             if (errno == EACCES) {
                 printf("    EACCES: Not enough permissions to open file\n");
             }
-            return -1; // TODO close socket
+            /* Close socket and free resources */
+            freeaddrinfo(res);
+            close(fd);
+
+            return -1;
         }
         srand(SEED); /* Set seed for random num generator */
     }
@@ -205,7 +209,7 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
         /* Error */
         printf("Error (send_message): An error occured while sending a message.\n");
         printf("    error message was received from ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)\n");
-        exit(1);    // TODO error message
+        exit(1);
     }
 
     return 0;
@@ -270,7 +274,7 @@ struct request* process_input(char buffer[]) {
     A string is a valid player ID if and only if:
      - It has size 6 
      - All six of the characters are digits 
-     - The first (leftmost) digit is 0 or 1 */ // TODO finish documentation
+     - The first (leftmost) digit is 0 or 1 */
 int valid_PLID(std::string PLID) {
 
     /* Check string size */
@@ -423,7 +427,7 @@ std::string max_tries(std::string word) {
     The first line on an active game file is of the type
     <word> <hint_file>
      */
-std::string get_first_line_from_game_file(struct request *req) {
+std::string get_first_line_from_game_file(struct request *req) { // TODO check if this function is being used
 
     FILE *fp;
 
@@ -532,6 +536,7 @@ void treat_guess(int fd, struct addrinfo *res, struct request *req) {
 
     if (word == req->letter_word) { // Won the game
         /* Prepare reply for client */
+        active_games.erase(req->PLID); /* Delete active game from hash table */
         message = message + WIN + moves;
         move_to_SCORES(req, W);
         // TODO move file completed GAMES subdir
@@ -548,8 +553,6 @@ void treat_guess(int fd, struct addrinfo *res, struct request *req) {
 
     /* Send reply to client */
     send_message(fd, message.c_str(), message.length(), res);
-
-    // TODO atualizar game struct
 
 }
 
@@ -891,11 +894,8 @@ void treat_quit(int fd, struct addrinfo *res, struct request *req) {
     else {
         /* Close game and move file to SCORES */
 
+        active_games.erase(req->PLID); /* Delete active game from hash table */
         move_to_SCORES(req, Q);
-        /*std::string file_name = SCORES + get_current_date_and_time() + "_" + Q + ".txt";
-        std::string current_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
-        std::string shell_command = "mv " + current_path + " " + file_name;
-        system(shell_command.c_str());*/
 
         status = OK;
     }
@@ -976,7 +976,7 @@ void treat_play(int fd, struct addrinfo *res, struct request *req) {
         update_game(req);
         if (won_game(req)) {
             /* Won the game */
-
+            active_games.erase(req->PLID); /* Delete active game from hash table */
             message = message + WIN + "\n";
             move_to_SCORES(req, W);
 
@@ -1002,8 +1002,6 @@ void treat_play(int fd, struct addrinfo *res, struct request *req) {
     }
     send_message(fd, message.c_str(), message.length(), res);
 
-
-    // TODO atualizar game struct
 }
 
 /* Positions:
@@ -1031,6 +1029,9 @@ std::string positions(char letter, std::string word) {
 }
 
 
+/* Create Game Session:
+    Creates and populates a new struct game, adds it to the
+    active_games unordered_map (hash map) and returns a pointer to it */
 void create_game_session(std::string word, char moves, std::string PLID, std::string hint) {
     struct game *new_game = (struct game *) malloc(sizeof(struct game));
     if (new_game == NULL) {
@@ -1053,6 +1054,8 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     active_games.insert({PLID, new_game}); // TODO lembrar de dar pop quando o jogo acaba
 }
 
+/* Update Game:
+    Updates a player's corresponding active game struct */
 void update_game(struct request *req) {
     auto it = active_games.find(req->PLID); // Gets iterator pointing to game
     struct game *g = it->second;
@@ -1078,6 +1081,7 @@ void update_game(struct request *req) {
 int won_game(struct request *req) {
     auto it = active_games.find(req->PLID); // Gets iterator pointing to game
     struct game *g = it->second;
+
 
     return g->word == g->word_knowledge;
 }
