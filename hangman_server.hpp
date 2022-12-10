@@ -21,5 +21,11 @@
 #define G "G"
 #define LINE_SIZE 32
 
+#define GAMES_DIR "GAMES/"
+#define COPY "cp "
+#define MOVE "mv "
 #define ACTIVE_GAME_PATH "GAMES/GAME_"
 #define SCORES "SCORES/"
+
+#define FALSE 0
+#define TRUE 1
