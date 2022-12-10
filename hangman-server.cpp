@@ -53,9 +53,11 @@ struct request* process_input(char buffer[]);
 void create_game_session(std::string word, char moves, std::string PLID, std::string hint);
 std::string get_random_line_from_file();
 void create_active_game_file(std::string game, struct request *req);
+int valid_PLID(std::string PLID);
 std::string get_word(std::string line);
 std::string get_hint(std::string line);
 std::string max_tries(std::string word);
+void report_error(int fd, struct addrinfo *res, struct request *req);
 int treat_request(int fd, struct addrinfo *res, struct request *req);
 void treat_start(int fd, struct addrinfo *res, struct request *req);
 void treat_guess(int fd, struct addrinfo *res, struct request *req);
@@ -67,11 +69,15 @@ int compare_plays(struct request *req, std::string line);
 int get_move_number(struct request *req);
 char* get_word_and_hint(struct request *req);
 int check_for_active_game(struct request *req);
-std::string get_current_date_and_time();
+std::string get_current_date_and_time(std::string directory);
 void update_game(struct request *req);
 void move_to_SCORES(struct request *req, char code);
 int won_game(struct request *req);
 int FindLastGame(char *PLID, char *fname);
+void increment_game_error(struct request *req);
+void increment_game_trials(struct request *req);
+void decrement_game_trials(struct request *req);
+std::string get_game_errors(struct request *req);
 /*int FindTopScores(SCORELIST ∗list)*/
 
 struct request {
@@ -79,6 +85,7 @@ struct request {
     std::string PLID;
     std::string letter_word;
     std::string trial;
+    int error;
 };
 
 struct game {
@@ -88,6 +95,7 @@ struct game {
     std::string move_number;
     std::string hint_file;  // TODO meter o hint file aqui durante o treat request
     std::string word_knowledge;
+    int errors;
 };
 
 
@@ -216,7 +224,7 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
 }
 
 
-/* Treat Start:
+/* Process Input:
     Receives a buffer containing what was read from the socket
     
     Parses information stored in buffer onto a struct request and returns
@@ -229,21 +237,34 @@ struct request* process_input(char buffer[]) {
         printf("Error (process_input): Ran out of memory while allocating space for the request\n");
         return NULL;
     }
+    req->error = FALSE;
 
     int i = 0;
     /* Retrieve op code defining the requested functionality from the server */
-    while (buffer[i] != ' ') {
+    while (buffer[i] != ' ' && i < BLOCK_SIZE) {
         req->op_code.push_back(buffer[i]);
         i++;
     }
     i++;
 
     /* Retrieve the player ID */
-    while (buffer[i] != ' ' || buffer[i] != '\0') {
+    while ((buffer[i] != ' ' || buffer[i] != '\0')  && i < BLOCK_SIZE) {
         req->PLID.push_back(buffer[i]);
         i++;
-    } 
+
+        if (i == BLOCK_SIZE) {
+            /* Should have never gotten this big */
+            req->error = TRUE;
+            return req;
+        }
+    }
     i++;
+
+    if (valid_PLID(req->PLID) == -1) {
+        /* Invalid PLID */
+        req->error = TRUE;
+                    // TODO maybe use req->error instead of valid_plid in other parts of code
+    }
 
     if (req->op_code.compare(QUT) || req->op_code.compare(REV)) {
         /* Nothing more to parse */
@@ -252,16 +273,38 @@ struct request* process_input(char buffer[]) {
     }
 
     /* Retrieve guessed letter or word */
-    while (buffer[i] != ' ') {
+    while (buffer[i] != ' ' && i < BLOCK_SIZE) {
+        if (!isalpha(buffer[i])) {
+            /* Invalid Syntax */
+            req->error = TRUE;
+        }
+
         req->letter_word.push_back(buffer[i]);
         i++;
+
+        if (i == BLOCK_SIZE) {
+            /* Should have never gotten this big */
+            req->error = TRUE;
+            return req;
+        }
     }
     i++;
 
     /* Retrieve current number of attempts */
-    while (buffer[i] != '\0') {
+    while (buffer[i] != '\0' && i < BLOCK_SIZE) {
+
+        if (!isdigit(buffer[i])) {
+            /* Invalid syntax: All requests with this many parameters end with move number */
+            req->error = TRUE;
+        }
         req->trial.push_back(buffer[i]);
         i++;
+
+        if (i == BLOCK_SIZE) {
+            /* Should have never gotten this big */
+            req->error = TRUE;
+            return req;
+        }
     }
 
     return req;
@@ -269,7 +312,8 @@ struct request* process_input(char buffer[]) {
 
 /* Valid PLID:
 
-    Checks if a string corresponds to a valid player ID.
+    Checks if a string corresponds to a valid player ID. Returns 0 if it is valid,
+    otherwise returns -1
     
     A string is a valid player ID if and only if:
      - It has size 6 
@@ -340,6 +384,13 @@ std::string get_random_line_from_file() {
     that implements that functionality */
 int treat_request(int fd, struct addrinfo *res, struct request *req) {
 
+    if (req->error == TRUE) {
+        /* Something in the given request is invalid */
+
+        report_error(fd, res, req);
+        return 0;
+    }
+
     if (req->op_code == SNG) {
         /* Start New Game */
         treat_start(fd, res, req);
@@ -357,7 +408,7 @@ int treat_request(int fd, struct addrinfo *res, struct request *req) {
     }
     else {
         /* Invalid protocol message */
-        std::string message = ERR + '\n'; // TODO see if other parts of req are invalid
+        std::string message = ERR + '\n'; // TODO see if other parts of req are invalid (Acho que já está feio ?)
         send_message(fd, message.c_str(), message.length(), res);
     }
 
@@ -510,10 +561,12 @@ void treat_guess(int fd, struct addrinfo *res, struct request *req) {
     message.push_back(' ');
 
     /* Look for active games with req->PLID */
-    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) { // TODO also need to send ERR in some other cases
-        /* No active game for req->PLID */
-        message = message + ERR + "\n";
-        send_message(fd, message.c_str(), message.length(), res);
+    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
+        /* Send error message */
+        
+        report_error(fd, res, req);
+        //message = message + ERR + "\n";
+        //send_message(fd, message.c_str(), message.length(), res);
     }
 
     /* Compare number of moves to req->trials */
@@ -533,22 +586,24 @@ void treat_guess(int fd, struct addrinfo *res, struct request *req) {
 
     /* Write play to game file */
     record_move_for_active_game(req);
+    increment_game_trials(req);
 
     if (word == req->letter_word) { // Won the game
         /* Prepare reply for client */
-        active_games.erase(req->PLID); /* Delete active game from hash table */
         message = message + WIN + moves;
         move_to_SCORES(req, W);
-        // TODO move file completed GAMES subdir
     }
-    else if (req->trial == max_tries(word)) { // No more errors
-        /* Prepare reply for client */
-        message = message + OVR + moves;
-        move_to_SCORES(req, F);
-    }
-    else { // Incorrect guess, but with remaining attempts
-        /* Prepare reply for client */
-        message = message + NOK + moves;
+    else {
+        increment_game_error(req);
+        if (get_game_errors(req) == max_tries(word)) { // No more errors
+                /* Prepare reply for client */
+                message = message + OVR + moves;
+                move_to_SCORES(req, F);
+            }
+        else { // Incorrect guess, but with remaining attempts
+            /* Prepare reply for client */
+            message = message + NOK + moves;
+        }
     }
 
     /* Send reply to client */
@@ -861,18 +916,37 @@ char* get_word_and_hint(struct request *req) {
 
 /* Move to Scores:
 
-    Renames active game file for playe req->PLID to the format
-    YYYYMMDD_HHMMSS_code.txt
-    where code is either W (win), F (Fail) or Q (Quit) and moves it 
-    to the SCORES/ directory */
+    Renames active game file for player req->PLID to the format
+    YYYYMMDD_HHMMSS_code.txt where code is either W (win), F (Fail) or
+    Q (Quit) and moves it to the SCORES/ directory 
+    
+    Additionally, removes the pointer to the struct game corresponding to req->PLID
+    from the unordered map "active_games" and frees the memory allocated for that
+    pointer to struct game */
 void move_to_SCORES(struct request *req, char code) {
     /* Code should be Q, F or W */
 
-    std::string file_name = SCORES + get_current_date_and_time() + "_" + code + ".txt";
+    /* Get game struct */
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    /* Copy game file's content to GAMES/PLID/ */
+
+    std::string file_name = GAMES_DIR + req->PLID + "/" + get_current_date_and_time(GAMES_DIR) + "_" + code + ".txt";
     std::string current_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
-    std::string shell_command = "mv " + current_path + " " + file_name;
+    std::string shell_command = COPY + current_path + " " + file_name;
     system(shell_command.c_str());
 
+    /* Move game file to SCORES/ */
+    file_name = SCORES + g->move_number + "_" + req->PLID + "_" + get_current_date_and_time(SCORES) + ".txt";
+    shell_command = MOVE + current_path + " " + file_name;
+    system(shell_command.c_str());
+
+
+    /* Remove game from unordered map and free memory */
+
+    free(g);
+    active_games.erase(req->PLID); // Remove game from hash table
 }
 
 
@@ -894,7 +968,6 @@ void treat_quit(int fd, struct addrinfo *res, struct request *req) {
     else {
         /* Close game and move file to SCORES */
 
-        active_games.erase(req->PLID); /* Delete active game from hash table */
         move_to_SCORES(req, Q);
 
         status = OK;
@@ -909,13 +982,23 @@ void treat_quit(int fd, struct addrinfo *res, struct request *req) {
 
 /* Get Current Date and Time:
 
-    Returns current date and time in the format
-    YYYYMMDD_HHMMSS */
-std::string get_current_date_and_time() {
+    If directory == GAMES: returns current date and time in the format
+    YYYYMMDD_HHMMSS 
+    
+    If directory == SCORES: returns current date and time in the format
+    DDMMYYYY_HHMMSS */
+std::string get_current_date_and_time(std::string directory) {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
 
-    std::string output = std::to_string(tm.tm_year) + std::to_string(tm.tm_mon) + std::to_string(tm.tm_mday) + "_";
+    std::string output;
+    if (directory == SCORES) {
+        output = std::to_string(tm.tm_year) + std::to_string(tm.tm_mon) + std::to_string(tm.tm_mday) + "_";
+    }
+    else {
+        output = std::to_string(tm.tm_mday) + std::to_string(tm.tm_mon) + std::to_string(tm.tm_year) + "_";
+    }
+
     output = output + std::to_string(tm.tm_hour) + std::to_string(tm.tm_min) + std::to_string(tm.tm_sec);
 
     return output;
@@ -945,14 +1028,16 @@ void treat_play(int fd, struct addrinfo *res, struct request *req) {
     message.push_back(' ');
 
     /* Look for active games with req->PLID */
-    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) { // TODO also need to send ERR in some other cases
-        /* No active game for req->PLID */
-        message = message + ERR + "\n";
-        send_message(fd, message.c_str(), message.length(), res);
+    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
+        /* Send error message */
+
+        report_error(fd, res, req);
+        //message = message + ERR + "\n";
+        //send_message(fd, message.c_str(), message.length(), res);
         return;
     }
 
-    /* Compare number of moves to req->trials */
+    /* Compare number of moves to req->trials */ // TODO isto ainda está mal (o move_numbers está a ver o nº de erros e não devia)
     int move_number = get_move_number(req);
     std::string moves = std::to_string(' ') + std::to_string(move_number) + "\n";
     if (std::stoi(req->trial) != move_number) {
@@ -971,12 +1056,13 @@ void treat_play(int fd, struct addrinfo *res, struct request *req) {
     /* Write to play to file */
     record_move_for_active_game(req);
 
+    // TODO falta o DUP!!!!
+
     if (!(positions((req->letter_word).front(), word).empty())) { // Some positions were found
         /* Prepare reply for client and update game file */
         update_game(req);
         if (won_game(req)) {
             /* Won the game */
-            active_games.erase(req->PLID); /* Delete active game from hash table */
             message = message + WIN + "\n";
             move_to_SCORES(req, W);
 
@@ -989,16 +1075,18 @@ void treat_play(int fd, struct addrinfo *res, struct request *req) {
             message = message + positions((req->letter_word).front(), word) + "\n";
         }
     }
-    else if (req->trial == max_tries(word)) { // No more errors
-        /* Prepare reply for client */
-        message = message + OVR + moves;
-        move_to_SCORES(req, F);
-
-        // TODO falta mudar para completed GAMES subdir
-    }
-    else { // Incorrect guess, but with remaining attempts
-        /* Prepare reply for client */
-        message = message + NOK + moves;
+    else { /* Wrong guess */
+        increment_game_error(req);
+        increment_game_trials(req);
+        if (get_game_errors(req) == max_tries(word)) { // No more errors
+            /* Prepare reply for client */
+            message = message + OVR + moves;
+            move_to_SCORES(req, F);
+        }
+        else { // Incorrect guess, but with remaining attempts
+            /* Prepare reply for client */
+            message = message + NOK + moves;
+        }
     }
     send_message(fd, message.c_str(), message.length(), res);
 
@@ -1042,6 +1130,7 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     new_game->word = word;
     new_game->PLID = PLID;
     new_game->max_errors = moves;
+    new_game->errors = 0;
     new_game->move_number = "1";
     new_game->hint_file = hint;
     
@@ -1061,9 +1150,7 @@ void update_game(struct request *req) {
     struct game *g = it->second;
 
     /* Update move number */
-    int moves = std::stoi(req->trial) + 1;
-    g->move_number = std::to_string(moves);
-    g->max_errors = moves;
+    increment_game_trials(req);
 
     int i = 0;
     for (auto c: g->word) {
@@ -1076,6 +1163,54 @@ void update_game(struct request *req) {
     }
 }
 
+
+/* Increment Game Error 
+
+    Increments the attribute errors for the struct game indexed by req->PLID */
+void increment_game_error(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    g->errors++;
+}
+
+/* Get Game Errors 
+
+    Getter function for the "errors" attribute of the struct game indexed by
+    req->PLID  */
+std::string get_game_errors(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    return std::to_string(g->errors);
+}
+
+
+/* Increment game trials 
+
+    Increment the attribute move_number for the struct game indexed by req->PLID */
+void increment_game_trials(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    /* Update move number */
+    int moves = std::stoi(req->trial) + 1;
+    g->move_number = std::to_string(moves);
+}
+
+
+/* Decrement game trials 
+
+    Decrement the attribute move_number for the struct game indexed by req->PLID */
+void decrement_game_trials(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    /* Update move number */
+    int moves = std::stoi(req->trial) - 1;
+    g->move_number = std::to_string(moves);
+}
+
 /* Won Game:
     Checks if the player (req->PLID) has won the game */
 int won_game(struct request *req) {
@@ -1084,4 +1219,34 @@ int won_game(struct request *req) {
 
 
     return g->word == g->word_knowledge;
+}
+
+/* Report Error:
+    Sends an error message to the client
+
+    If the struct request pointed to by req has PWG or RLG as an op_code, the
+    reply format is:
+        op_code ERR\n
+    
+    Otherwise, it is:
+        ERR\n*/
+void report_error(int fd, struct addrinfo *res, struct request *req) {
+    std::string message;
+
+    if (req->op_code == PWG || req->op_code == RLG) {
+        /* Invalid guess or play request */
+        message = req->op_code + " ";
+    }
+    
+    std::string error = ERR;
+    error.push_back('\n');
+    if (message.empty()) {
+        /* Not one of the aforementioned requests */
+        message = error;
+    }
+    else {
+        message = message + error;
+    }
+
+    send_message(fd, message.c_str(), message.length(), res);
 }
