@@ -49,7 +49,9 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in addr;
 
     // check if the number of arguments is correct
-    if (argc != 3) exit(1);
+    if (argc != 3) {
+        exit(1); // TODO error message
+    }
 
     // get the server's IP address and port number
     char *server_ip = argv[1];
@@ -155,7 +157,9 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     send_message(fd, message.c_str(), message.length(), res);
 
     char buffer[BLOCK_SIZE];
+    printf("start_new_game: Buffer before receiving message\n%s", buffer);
     receive_message(fd, addr, buffer, BLOCK_SIZE);
+    printf("start_new_game: Buffer after receiving message\n%s", buffer);
     std::string response = buffer;
 
     // remove \n from response

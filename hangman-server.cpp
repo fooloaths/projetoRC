@@ -33,6 +33,9 @@ Mateus Pinho - ist199282
 #include <fstream>
 #include <time.h>
 #include <unordered_map>
+#include <bits/stdc++.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 // TODO don't add \n from hint to file
 // TODO check if ID is already in use
@@ -41,11 +44,11 @@ Mateus Pinho - ist199282
 
 #define NUMBER_THREADS 16
 #define BLOCK_SIZE 256
-#define PORT "58000"
+#define PORT "58011"
 #define GAME_NAME 15
 #define SEED 73
 #define NUMBER_OF_WORDS 6       // TODO algumas destas constantes foram tiradas do rabo
-#define WORLD_LINE_SIZE 64
+#define WORD_LINE_SIZE 25
 
 
 int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res);
@@ -78,6 +81,7 @@ void increment_game_error(struct request *req);
 void increment_game_trials(struct request *req);
 void decrement_game_trials(struct request *req);
 std::string get_game_errors(struct request *req);
+int file_exists(std::string name);
 /*int FindTopScores(SCORELIST ∗list)*/
 
 struct request {
@@ -100,7 +104,7 @@ struct game {
 
 
 std::unordered_map<std::string, struct game*> active_games;
-std::string word_file = "word_file";
+std::string word_file = "word_eng.txt";
 FILE* fp_word_file;
 
 
@@ -121,6 +125,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    word_file = argv[1];
+    printf("word_file = %s\n", word_file.c_str());
+
     printf("Starting hangman game server\n");
 
     memset(&act, 0,sizeof(act));
@@ -130,14 +137,14 @@ int main(int argc, char **argv) {
     }
 
     int pid = fork();
-    if (pid == 0) { /* Child Process*/
+    if (pid != 0) { /* Parent process */
         /* UDP server */
         fd = socket(AF_INET,SOCK_DGRAM,0); //UDP socket
         if (fd == -1) {
             printf("Error (main): An error occured while attempting to create an UDP socket\n");
             exit(1);
         }
-        fp_word_file = fopen("word_file", "r");
+        fp_word_file = fopen(word_file.c_str(), "r");
         if (fp_word_file == NULL) {
             printf("Error (main): Couldn't open word file.\n");
             if (errno == EACCES) {
@@ -168,7 +175,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    n = bind(fd,res->ai_addr, res->ai_addrlen);
+    n = bind(fd, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
         printf("Error (main): An error occured while binding the address to the UDP socket file descriptor\n");
         exit(1);
@@ -178,27 +185,33 @@ int main(int argc, char **argv) {
     while (1) {
         /* Read requests from UDP socket */
         addrlen = sizeof(addr);
+        printf("Main Loop: Before reading from socket, buffer was\n%s",buffer);
+        printf("Main Loop: Going to read from socket\n");
         n = recvfrom(fd,buffer, BLOCK_SIZE,0, (struct sockaddr*) &addr, &addrlen);
+        printf("Main Loop: Read buffer from socket\n%s", buffer);
         if (n == -1) {
             printf("Error (main): An error occured while trying to receive a message from the UDP socket\n");
             exit(1);
         }
 
-        write(1,"received: ",10); write(1,buffer,n); // TODO remover isto mais tarde. Vai servir de teste por agora
-
+        printf("Main Loop: Going to process input\n");
         struct request *req = process_input(buffer);
+        printf("Main Loop: Input Processed\n");
         if (req == NULL) {
             printf("Error (main): Couldn't allocate memory to process request\n");
         }
+        printf("Main Loop: Going to treat request\n");
         treat_request(fd, res, req);
+        printf("Main Loop: requested taken care of\n");
 
+        /* Reset buffer */
+        memset(buffer, '\0', BLOCK_SIZE);
 
-
-        n = sendto(fd,buffer,n,0, (struct sockaddr*)&addr,addrlen);
+        /*n = sendto(fd,buffer,n,0, (struct sockaddr*)&addr,addrlen);
         if (n == -1) {
             printf("Error (main): An error occured while sending a reply\n");
             exit(1);
-        }
+        }*/
     }
 
     freeaddrinfo(res);
@@ -219,6 +232,9 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
         printf("    error message was received from ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)\n");
         exit(1);
     }
+    else { // TODO remove else
+        printf("N = %ld bytes were sent. k = %ld were supoosed to be sent\n", n, buf_size);
+    }
 
     return 0;
 }
@@ -230,6 +246,8 @@ int send_message(int fd, const char* message, size_t buf_size, struct addrinfo *
     Parses information stored in buffer onto a struct request and returns
     a pointer to that struct */
 struct request* process_input(char buffer[]) {
+    printf("process_input: Starting to parse input\n");
+
     struct request *req = (struct request *) malloc(sizeof(struct request));
     
     /* Check if memory for the request was correctly allocated */
@@ -239,43 +257,68 @@ struct request* process_input(char buffer[]) {
     }
     req->error = FALSE;
 
+    printf("process_input: Reading OP Code\n");
     int i = 0;
     /* Retrieve op code defining the requested functionality from the server */
     while (buffer[i] != ' ' && i < BLOCK_SIZE) {
         req->op_code.push_back(buffer[i]);
         i++;
-    }
-    i++;
-
-    /* Retrieve the player ID */
-    while ((buffer[i] != ' ' || buffer[i] != '\0')  && i < BLOCK_SIZE) {
-        req->PLID.push_back(buffer[i]);
-        i++;
 
         if (i == BLOCK_SIZE) {
             /* Should have never gotten this big */
+            printf("process_input: Read too much from buffer (1)\n");
             req->error = TRUE;
             return req;
         }
     }
     i++;
+    printf("process_input: OP Code read, op_code = %s, i = %i\n", (req->op_code).c_str(), i);
 
+    /* Retrieve the player ID */
+    printf("process_input: Reading player ID\n");
+    while ((buffer[i] != ' ' && buffer[i] != '\0' && buffer[i] != '\n')  && i < BLOCK_SIZE) {
+        printf("\ni = %d , buffer[i] = %c\n", i, buffer[i]);
+        if (buffer[i] == '\0') {
+            printf("aaaaaaaaaaaaaaaaaaaaaaaaa\n");
+        }
+        if (buffer[i] == '\n') {
+            printf("nnnnnnnnnnnnnnnnnnnnnnnnn\n");
+        }
+
+        req->PLID.push_back(buffer[i]);
+        i++;
+
+        if (i == BLOCK_SIZE) {
+            /* Should have never gotten this big */
+            printf("process_input: Read too much from buffer (2)\n");
+            req->error = TRUE;
+            return req;
+        }
+    }
+    i++;
+    printf("process_input: PLID read, PLID = %s, i = %d\n", (req->PLID).c_str(), i);
+
+    printf("process_input: Checking if PLID is valid\n");
     if (valid_PLID(req->PLID) == -1) {
         /* Invalid PLID */
+        printf("process_input: Invalid PLID\n");
         req->error = TRUE;
                     // TODO maybe use req->error instead of valid_plid in other parts of code
     }
 
-    if (req->op_code.compare(QUT) || req->op_code.compare(REV)) {
+    if (req->op_code == QUT || req->op_code == REV || req->op_code == SNG) {
         /* Nothing more to parse */
+        printf("process_input: Command was QUIT/EXIT/REV/SNG, so nothing more to read\n");
         req->letter_word = "NULL"; req->trial = "NULL";
         return req;
     }
 
     /* Retrieve guessed letter or word */
+    printf("process_input: Reading letter/word to be guessed\n");
     while (buffer[i] != ' ' && i < BLOCK_SIZE) {
         if (!isalpha(buffer[i])) {
             /* Invalid Syntax */
+            printf("process_input: Part of trial number wasn't a letter (buffer[i] = %c, i = %d)\n", buffer[i], i);
             req->error = TRUE;
         }
 
@@ -284,17 +327,21 @@ struct request* process_input(char buffer[]) {
 
         if (i == BLOCK_SIZE) {
             /* Should have never gotten this big */
+            printf("process_input: Read too much from buffer (3)\n");
             req->error = TRUE;
             return req;
         }
     }
     i++;
+    printf("process_input: Letter/Word read and it was %s, i = %d\n", (req->letter_word).c_str(), i);
 
     /* Retrieve current number of attempts */
-    while (buffer[i] != '\0' && i < BLOCK_SIZE) {
+    printf("process_input: Reading trial number\n");
+    while ((buffer[i] != '\n' && buffer[i] != '\0') && i < BLOCK_SIZE) {
 
         if (!isdigit(buffer[i])) {
             /* Invalid syntax: All requests with this many parameters end with move number */
+            printf("process_input: Part of trial number wasn't a digit (buffer[i] = %c, i = %d)\n", buffer[i], i);
             req->error = TRUE;
         }
         req->trial.push_back(buffer[i]);
@@ -302,10 +349,13 @@ struct request* process_input(char buffer[]) {
 
         if (i == BLOCK_SIZE) {
             /* Should have never gotten this big */
+            printf("process_input: Read too much from buffer (4)\n");
             req->error = TRUE;
             return req;
         }
     }
+    printf("process_input: Trial number = %s, i = %d\n", (req->trial).c_str(), i);
+    printf("process_input: Finished\n");
 
     return req;
 }
@@ -328,14 +378,15 @@ int valid_PLID(std::string PLID) {
 
     /* Check that all characters in PLID are digits */
     int i = 0;
-    while (PLID[i] != '\0' || PLID[i] != '\n') {
+    while (PLID[i] != '\0') {
+
         if (PLID[i] < '0' || PLID[i] > '9') {
             return -1;
         }
         i++;
     }
 
-    if (PLID[0] > '1') {
+    if (PLID[0] < '0' || PLID[0] > '1') {
         /* First digit must be 0 or 1 */
         return -1;
     }
@@ -358,19 +409,22 @@ std::string get_random_line_from_file() {
     int line = rand() % NUMBER_OF_WORDS;
 
     int line_num = 1;
-    char *buffer = (char *) malloc(WORLD_LINE_SIZE * sizeof(char));
+    char *buffer = (char *) malloc(WORD_LINE_SIZE * sizeof(char));
     if (buffer == NULL) {
         printf("Error (get_random_line_from_file): Ran out of memory\n");
     }
 
-    size_t buf_size = WORLD_LINE_SIZE;
+    size_t buf_size = WORD_LINE_SIZE;
 
     /* Fetch a random line from the file */
+    printf("get_random_line_from_file: Looking for line nº %d\n", line);
+    printf("get_random_line_from_file: Starting loop\n");
     while (getline(&buffer, &buf_size, fp_word_file)) {
         if (line_num == line) {
             break;
         }
-        memset(buffer, '\0', WORLD_LINE_SIZE);
+        line_num++;
+        memset(buffer, '\0', WORD_LINE_SIZE);
     }
     return buffer;
 }
@@ -383,9 +437,11 @@ std::string get_random_line_from_file() {
     Checks the op_code associated with the request and calls the sub-routine
     that implements that functionality */
 int treat_request(int fd, struct addrinfo *res, struct request *req) {
+    printf("treat_request: Starting function\n");
 
     if (req->error == TRUE) {
         /* Something in the given request is invalid */
+        printf("treat_request: Something in the request is invalid. Send error to client\n");
 
         report_error(fd, res, req);
         return 0;
@@ -422,33 +478,51 @@ int treat_request(int fd, struct addrinfo *res, struct request *req) {
     If the client has not active game, a new one is started. 
     Otherwise a NOK (Not OK) status message is send back to the client */
 void treat_start(int fd, struct addrinfo *res, struct request *req) {
-    char* fname = (char *) malloc(GAME_NAME * sizeof(char));
-    int found = FindLastGame(&req->PLID[0], fname);
+    printf("treat_start: Starting function\n");
+
+    //char* fname = (char *) malloc(GAME_NAME * sizeof(char));
     std::string status;
     std::string message = RSG;
     std::string suffix = " ";
     message.push_back(' ');
 
-    if (found == 0) {
+    std::string game_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+    printf("treat_start: game file path = %s\n", game_path.c_str());
+
+    printf("treat_start: Finding last game\n");
+    //int found = FindLastGame(&(req->PLID[0]), fname);
+    int found = file_exists(game_path);
+    if (found == -1) {
         /* No active game found for player PLID */
+        printf("treat_start: No file found. Creating one\n");
+
         status = OK;
         std::string line = get_random_line_from_file();
+        printf("treat_start: The line that defines this game is %s\n", line.c_str());
         std::string word = get_word(line);
+        printf("treat_start: The word that defines this game is %s\n", word.c_str());
         std::string hint = get_hint(line);
+        printf("treat_start: The hint that defines this game is %s\n", hint.c_str());
         suffix = suffix + std::to_string(word.length());
         std::string moves = max_tries(moves);
         suffix.push_back(' '); suffix.push_back(moves.front());
         create_active_game_file(line, req);
+
+        printf("treat_start: Created file\n");
     }
     else {
+        printf("treat_start: File found\n");
         status = NOK;
     }
     message = message + status;
-    if (found == 0) {
+    if (found == -1) {
         message = message + suffix;
     }
+    message = message + "\n";
 
+    printf("treat_start: Sending reply message\nmessage = %s", message.c_str());
     send_message(fd, message.c_str(), message.length(), res);
+    printf("treat_start: Reply sent\n");
 }
 
 /* Max Tries:
@@ -492,11 +566,11 @@ std::string get_first_line_from_game_file(struct request *req) { // TODO check i
     sprintf(fname, "GAMES/GAME_%s.txt", (req->PLID).c_str());
     
     /* Allocate memory for string that will store first line from file */
-    char *buffer = (char *) malloc(WORLD_LINE_SIZE * sizeof(char));
+    char *buffer = (char *) malloc(WORD_LINE_SIZE * sizeof(char));
     if (buffer == NULL) {
         printf("Error (get_first_line_from_game_file): Ran out of memory\n");
     }
-    size_t buf_size = WORLD_LINE_SIZE;
+    size_t buf_size = WORD_LINE_SIZE;
 
     /* Open game file */
     fp = fopen(fname, "r");
@@ -531,7 +605,7 @@ std::string get_hint(std::string line) {
     while (line[i] != ' ') {i++;}
     i++;
 
-    while (line[i] != '\0') {
+    while (line[i] != '\0' && line[i] != '\n') {
         output.push_back(line[i]);
         i++;
     }
@@ -565,8 +639,6 @@ void treat_guess(int fd, struct addrinfo *res, struct request *req) {
         /* Send error message */
         
         report_error(fd, res, req);
-        //message = message + ERR + "\n";
-        //send_message(fd, message.c_str(), message.length(), res);
     }
 
     /* Compare number of moves to req->trials */
@@ -732,6 +804,8 @@ int is_directory(std::string dir) {
     }
     else if (directory != NULL) {
         /* Directory exists */
+        closedir(directory);
+
         return 0;
     }
     else {
@@ -930,9 +1004,27 @@ void move_to_SCORES(struct request *req, char code) {
     auto it = active_games.find(req->PLID); // Gets iterator pointing to game
     struct game *g = it->second;
 
+    /* Check if a directory exists for req->PLID's completed games, otherwise
+        create it */
+    
+    std::string completed_games = GAMES_DIR + req->PLID; // TODO acabar
+    DIR *directory = opendir(completed_games.c_str());
+
+    if (directory == NULL) {
+        /* Doesn't Exist. Create it */
+        if (mkdir(completed_games.c_str(), 0777) == -1) {
+            /* Failed to create directory */
+            printf("Error (move_to_SCORES): Failed to create directory");
+            std::cerr << "Error :  " << strerror(errno) << std::endl;
+        }
+    }
+    else {
+        closedir(directory);
+    }
+
     /* Copy game file's content to GAMES/PLID/ */
 
-    std::string file_name = GAMES_DIR + req->PLID + "/" + get_current_date_and_time(GAMES_DIR) + "_" + code + ".txt";
+    std::string file_name = completed_games + "/" + get_current_date_and_time(GAMES_DIR) + "_" + code + ".txt";
     std::string current_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
     std::string shell_command = COPY + current_path + " " + file_name;
     system(shell_command.c_str());
@@ -1249,4 +1341,17 @@ void report_error(int fd, struct addrinfo *res, struct request *req) {
     }
 
     send_message(fd, message.c_str(), message.length(), res);
+}
+
+/* File exists:
+
+    Returns 0 if file exists, otherwise returns -1*/
+int file_exists(std::string name) {
+    if (FILE *file = fopen(name.c_str(), "r")) {
+        fclose(file);
+        return 0;
+    }
+    else {
+        return -1;
+    }   
 }
