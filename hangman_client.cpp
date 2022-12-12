@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
         } else if (command == "rev") {
             reveal_word(fd, res, addr);
         } else {
-            printf("Input Error: Invalid command.\n");
+            std::cout << "Input Error: Invalid command.\n";
         }
     }
 
@@ -131,7 +131,7 @@ void send_message(int fd, const char* message, size_t buf_size, struct addrinfo 
 }
 
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE];
+    char buffer[BLOCK_SIZE] = {0};
     std::string message = REV + player_id + "\n";
     send_message(fd, message.c_str(), message.length(), res);
     receive_message(fd, addr, buffer, BLOCK_SIZE);
@@ -144,10 +144,10 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
     if (status == "OK") {
         exit(1);
     } else if (status == "ERR") {
-        std::cout << "There is no ongoing game." << std::endl;
+        std::cout << "There is no ongoing game.\n";	
         exit(1);
     } else {
-        std::cout << "The word is " << status << std::endl;
+        std::cout << "The word is " << status << "\n";
     }
 }   
 
@@ -155,12 +155,12 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     player_id = id;
     std::string message = SNG + id + "\n";
+    char buffer[BLOCK_SIZE] = {0};
+    
     send_message(fd, message.c_str(), message.length(), res);
-
-    char buffer[BLOCK_SIZE];
-    printf("start_new_game: Buffer before receiving message\n%s", buffer);
-    receive_message(fd, addr, buffer, BLOCK_SIZE);
-    printf("start_new_game: Buffer after receiving message\n%s", buffer);
+    // // std::cerr << "start_new_game: Buffer before receiving message: " << buffer << std::endl;
+    receive_message(fd, addr, buffer, BLOCK_SIZE);  
+    // // std::cerr << "start_new_game: Buffer after receiving message: " << buffer << std::endl;
     std::string response = buffer;
 
     // remove \n from response
@@ -168,14 +168,21 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     // TODO fix input splitting    
     std::string response_command = response.substr(0 , response.find(' '));
     if (response_command == ERR) {
-        printf("el servidor no esta muy bueno ya?\n");
+        std::cout << "el servidor no esta muy bueno ya?\n";
         exit(1);
     }
     
     // TODO fix input splitting
     std::string status = get_status(response);
+    if (status != OK) {     
+        std::cout << "el servidor no esta muy bueno ya?\n";
+        exit(1);
+    }
+
     std::string n_letters = response.substr(response.find(' ', response.find(' ') + 1) + 1, response.find(' ', response.find(' ', response.find(' ') + 1) + 1));
     std::string max_errors = response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length());
+    
+    // // std::cerr << "start_new_game: status: " << status << std::endl;
 
     // convert number of letters into a number of underscores to print
     int n_letters_int = std::stoi(n_letters);
@@ -183,15 +190,12 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
         word += "_";
     }
 
-    if (status != OK) {
-        printf("el servidor no esta muy bueno ya?\n");
-        exit(1);
-    }
-
     std::string formatted_word = format_word();
-    printf("New game started (max %s errors): %s\n", max_errors.c_str(), formatted_word.c_str());
-}
+    // // printf("New game started (max %s errors): %s\n", max_errors.c_str(), formatted_word.c_str());
+    std::cout << "New game started (max " << max_errors << " errors): " << formatted_word << "\n";
 
+}
+ 
 std::string get_status(std::string message) {
     size_t i = 4; // Skip reply signature (RLG) and space
 
@@ -275,7 +279,7 @@ std::string play_aux_ok(const char* message, std::string letter) {
 }
 
 int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE];
+    char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     std::string response = "";
     const char* buf;
@@ -311,7 +315,7 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
 }
 
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE];
+    char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     std::string response = "";
     const char* buf;
@@ -445,7 +449,7 @@ void scoreboard(const char* server_ip, const char* server_port) {
 }
 
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE];
+    char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     std::string message = "QUT " + id + '\n';
 
