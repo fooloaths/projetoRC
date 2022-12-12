@@ -28,9 +28,9 @@ Mateus Pinho - ist199282
 #include <fstream>
 
 /* Global variables */
-int move_number = 1;
+int move_number;
 std::string player_id;
-std::string word = "";
+std::string word;
 
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 void receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
@@ -45,6 +45,7 @@ int guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in add
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr);
 void status(const char* server_ip, const char* server_port);
 void status_aux_ok(const char* message);
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
@@ -157,6 +158,7 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
 
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     player_id = id;
+    move_number = 1;
     std::string message = SNG + id + "\n";
     char buffer[BLOCK_SIZE] = {0};
     word = "";
@@ -369,7 +371,6 @@ void scoreboard_aux_ok(const char* message) {
     // split the string into two strings after the first space
     std::string scoreboard = message;
     scoreboard = scoreboard.substr(scoreboard.find(' ', scoreboard.find(' ') + 1) + 1, scoreboard.length());
-
     // scoreboard until the first space is file name
     std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
     // file_size is between the first space and the first space
@@ -377,7 +378,7 @@ void scoreboard_aux_ok(const char* message) {
     std::string file_size_str = file_size.substr(0, file_size.find(' '));
     auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
     // useful_info is the rest of the string
-    printf("SCOREBOARD:%s", useful_info.c_str());
+    std::cout << useful_info;
     
     // create new file named file_name with file_size bytes and write useful_info into it
     std::ofstream file(file_name);
@@ -386,59 +387,8 @@ void scoreboard_aux_ok(const char* message) {
 }
 
 void scoreboard(const char* server_ip, const char* server_port) {
-    int fd, errorcode;
-    ssize_t n;
-    struct addrinfo hints, *res;
-    std::string buffer;
-    char byte[1];
     std::string message = "GSB\n";
-
-    fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (fd == -1) {
-        close(fd);
-        exit(1);
-    }
-
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-
-    errorcode = getaddrinfo(server_ip, server_port, &hints, &res);
-    if (errorcode != 0) {
-        freeaddrinfo(res);
-        close(fd);
-        exit(1);
-    }
-
-    n = connect(fd, res->ai_addr, res->ai_addrlen);
-    if (n == -1) {
-        freeaddrinfo(res);
-        close(fd);
-        exit(1);
-    }
-
-    // TODO byte by byte writes
-    n = write(fd, message.c_str(), message.length());
-    if (n == -1) {
-        freeaddrinfo(res);
-        close(fd);
-        exit(1);
-    }
-
-    // read byte by byte until \n
-    while (byte[0] != '\n') {
-        n = read(fd, byte, 1);
-        if (n == -1) {
-            freeaddrinfo(res);
-            close(fd);
-            exit(1);
-        }
-        buffer.push_back(byte[0]);
-    }
-
-    std::string response = buffer;
-    // remove all characters after the first \n
-    response = response.substr(0, response.find('\n') + 1);
+    auto response = tcp_helper(message, server_ip, server_port);
     const char* buf = response.c_str();
 
     std::string status = get_status(buf);
@@ -447,18 +397,14 @@ void scoreboard(const char* server_ip, const char* server_port) {
     } else {
         printf("The scoreboard is empty!\n");
     }
-    
-    freeaddrinfo(res);
-    close(fd);
 }
 
-void status(const char* server_ip, const char* server_port) {
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port) {
     int fd, errorcode;
     ssize_t n;
     struct addrinfo hints, *res;
     std::string buffer;
     char byte[1];
-    std::string message = "STA " + player_id + "\n";
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -483,7 +429,7 @@ void status(const char* server_ip, const char* server_port) {
         close(fd);
         exit(1);
     }
-    
+
     // TODO byte by byte writes
     n = write(fd, message.c_str(), message.length());
     if (n == -1) {
@@ -492,7 +438,7 @@ void status(const char* server_ip, const char* server_port) {
         exit(1);
     }
 
-    // read byte by byte until \n
+    // read BLOCK_SIZE blocks until \n
     while (byte[0] != '\n') {
         n = read(fd, byte, 1);
         if (n == -1) {
@@ -504,8 +450,29 @@ void status(const char* server_ip, const char* server_port) {
     }
 
     std::string response = buffer;
-    // remove all characters after the first \n
-    response = response.substr(0, response.find('\n') + 1);
+    // number of digits is after the third space and the next \n
+    int digits = stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
+
+    char file_data[2000] = {0};
+    n = read(fd, file_data, digits);
+    if (n == -1) {
+        freeaddrinfo(res);
+        close(fd);
+        exit(1);
+    }
+
+    response.append(file_data);
+    // response = response.substr(0, response.find('\n'));
+    
+    freeaddrinfo(res);
+    close(fd);
+
+    return response;
+}
+
+void status(const char* server_ip, const char* server_port) {
+    std::string message = "STA " + player_id + "\n";
+    auto response = tcp_helper(message, server_ip, server_port);
     const char* buf = response.c_str();
 
     printf("response: %s", buf);
@@ -515,9 +482,6 @@ void status(const char* server_ip, const char* server_port) {
     } else {
         //TODO
     }
-
-    freeaddrinfo(res);
-    close(fd);
 } 
 
 void status_aux_ok(const char* message) {
