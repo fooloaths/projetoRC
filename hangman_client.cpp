@@ -374,11 +374,10 @@ void scoreboard_aux_ok(const char* message) {
     // scoreboard until the first space is file name
     std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
     // file_size is between the first space and the first space
-    auto file_size = scoreboard.erase(0, file_name.length() + 1);
-    std::string file_size_str = file_size.substr(0, file_size.find(' '));
     auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
-    // useful_info is the rest of the string
-    std::cout << useful_info;
+    // TODO remove newline from file
+    useful_info = useful_info.substr(1, useful_info.length()); 
+    std::cout << "SB" << useful_info;
     
     // create new file named file_name with file_size bytes and write useful_info into it
     std::ofstream file(file_name);
@@ -451,7 +450,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 
     std::string response = buffer;
     // number of digits is after the third space and the next \n
-    int digits = stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
+    size_t digits = (size_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
 
     char file_data[2000] = {0};
     n = read(fd, file_data, digits);
@@ -462,7 +461,6 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     }
 
     response.append(file_data);
-    // response = response.substr(0, response.find('\n'));
     
     freeaddrinfo(res);
     close(fd);
@@ -474,18 +472,25 @@ void status(const char* server_ip, const char* server_port) {
     std::string message = "STA " + player_id + "\n";
     auto response = tcp_helper(message, server_ip, server_port);
     const char* buf = response.c_str();
-
-    printf("response: %s", buf);
+    
     std::string status = get_status(buf);
     if (status.compare("ACT") == 0) {
         status_aux_ok(buf);
     } else {
-        //TODO
+        status_aux_ok(buf);
+        return;
     }
-} 
+}
 
 void status_aux_ok(const char* message) {
-    // TODO
+    // split the string into two strings after the first tab
+    std::string status = message;
+    status = status.substr(status.find("     ") + 1, status.length());
+    // remove all occurrences of "     " in the string
+    while (status.find("     ") != std::string::npos) {
+        status.erase(status.find("     "), 5);
+    }
+    std::cout << status;
 }
 
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {

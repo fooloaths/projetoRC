@@ -43,6 +43,7 @@
 *.pdb
 *.dump
 TOPSCORES*
+STATE*
 
 # Kernel Module Compile Results
 *.mod*
