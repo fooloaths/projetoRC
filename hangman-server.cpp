@@ -811,7 +811,7 @@ void record_move_for_active_game(struct request *req) {
     else {
         line = G;
     }
-    line = line + " " + req->letter_word;
+    line = line + " " + req->letter_word + "\n";
     file << line;
 
     /* Close file */
