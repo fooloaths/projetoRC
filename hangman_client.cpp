@@ -498,6 +498,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
         int to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
         std::cerr << "I'm gonna try and read " << to_read << std::endl;
         n = read(fd, file_data, to_read);
+
         std::cerr << "I read" << n << std::endl;
         if (n == -1) {
             freeaddrinfo(res);
