@@ -490,19 +490,30 @@ void status(const char* server_ip, const char* server_port) {
 void status_aux_ok(const char* message) {
     // split the string into two strings after the first tab
     std::string status = message;
+
+    // file_name is between the second space and the third space
+    auto second_space = status.find(' ', status.find(' ') + 1) + 1;
+    auto third_space = status.find(' ', second_space) + 1;
+    auto length = third_space - second_space;
+    auto file_name = status.substr(second_space, length);
+
     status = status.substr(status.find("     ") + 1, status.length());
     // remove all occurrences of "     " in the string
     while (status.find("     ") != std::string::npos) {
         status.erase(status.find("     "), 5);
     }
     std::cout << status;
+
+    std::ofstream file(file_name);
+    file << status;
+    file.close();
 }
 
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     auto inner_id = id;
-    if (player_id.empty()) {
+    if (player_id.empty() && id.empty()) {
         std::cout << "You haven't started a game yet!!!\n";
         return 1;
     }
