@@ -81,6 +81,7 @@ void increment_game_error(struct request *req);
 void increment_game_trials(struct request *req);
 void decrement_game_trials(struct request *req);
 std::string get_game_errors(struct request *req);
+std::string get_game_trials(struct request *req);
 int file_exists(std::string name);
 /*int FindTopScores(SCORELIST ∗list)*/
 
@@ -126,7 +127,6 @@ int main(int argc, char **argv) {
     }
 
     word_file = argv[1];
-    printf("word_file = %s\n", word_file.c_str());
 
 
     memset(&act, 0,sizeof(act));
@@ -297,7 +297,6 @@ struct request* process_input(char buffer[]) {
     }
 
     /* Retrieve guessed letter or word */
-    printf("process input: Going to parse letter/word guessed\n");
     while (buffer[i] != ' ' && i < BLOCK_SIZE) {
         if (!isalpha(buffer[i])) {
             /* Invalid Syntax */
@@ -313,18 +312,15 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
-    printf("processed_input: Word was %s\n", (req->letter_word).c_str());
     i++;
 
     /* Retrieve current number of attempts */
-    printf("process input: Going to parse trial number\n");
     while ((buffer[i] != '\n' && buffer[i] != '\0') && i < BLOCK_SIZE) {
 
         if (!isdigit(buffer[i])) {
             /* Invalid syntax: All requests with this many parameters end with move number */
             req->error = TRUE;
         }
-        printf("process_input: i = %d, buffer[i] = %c\n", i, buffer[i]);
         (req->trial).push_back(buffer[i]);
         i++;
 
@@ -334,7 +330,6 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
-    printf("processed_input: trial is %s\n", (req->trial).c_str());
 
 
     return req;
@@ -487,6 +482,7 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     }
     message = message + "\n";
 
+    printf("treat_start: The message being sent is\n%s", message.c_str());
     send_message(fd, message.c_str(), message.length(), addr, addrlen);
 }
 
@@ -599,63 +595,51 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     std::string message = RWG;
     message.push_back(' ');
 
-    printf("Treat guess: The word guessed is %s\n", (req->letter_word).c_str());
     /* Look for active games with req->PLID */
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
         /* Send error message */
-        printf("treat_guess: INVALID PLID\n");
-        
+        printf("Reporting error???\n");
         report_error(fd, addr, addrlen, req);
         return;
     }
 
     /* Compare number of moves to req->trials */
-    int move_number = get_move_number(req);
-    std::string moves = " " + std::to_string(move_number) + "\n";
-    printf("treat_guess: Request had trial = %s and file had moves = %d\n", (req->trial).c_str(), move_number);
-    printf("treat_guess: The variable moves to be appended to the message is moves = %s\n", moves.c_str());
-    if (req->trial != std::to_string(move_number)) {
+    std::string move_number = get_game_trials(req);
+    std::string moves = " " + move_number + "\n";
+    if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
         // TODO if duplicate guess, also reply INV
-        printf("treat_guess: Different trial numbers, going to reply INV\n");
+        printf("treat_guess: req->trial = %s , move_number = %s\n", req->trial, move_number);
+        printf("treat_guess: Going to send INV\n");
         message = message + INV + moves;
+        printf("Treat_guess: Sending the following\n%s", message.c_str());
         send_message(fd, message.c_str(), message.length(), addr, addrlen);
         return;
     }
-    printf("aaaaa\n");
 
     /* Compare res->word to the word */
-    printf("treat_guess: Getting word and hint from file\n");
     char *line = get_word_and_hint(req);
-    printf("treat_guess: Getting the word\n");
     std::string word = get_word(line);
-    printf("treat_guess: The word is word\n%s\n",word.c_str());
     free(line);
 
     /* Write play to game file */
-    printf("treat_guess: Recording move and updating game data\n");
     record_move_for_active_game(req);
     increment_game_trials(req);
 
     if (word == req->letter_word) { // Won the game
         /* Prepare reply for client */
-        printf("treat_guess: VICTORY! The word is correct\n");
         message = message + WIN + moves;
         move_to_SCORES(req, W);
-        printf("treat_guess: Got out of move scores!!!\n");
     }
     else {
-        printf("treat_guess: Guess failed. Incrementing errors\n");
         increment_game_error(req);
         if (get_game_errors(req) == max_tries(word)) { // No more errors
                 /* Prepare reply for client */
-                printf("treat_guess: No more tries :(\n");
                 message = message + OVR + moves;
                 move_to_SCORES(req, F);
             }
         else { // Incorrect guess, but with remaining attempts
             /* Prepare reply for client */
-            printf("treat_guess: Incorrect Guess\n");
             message = message + NOK + moves;
         }
     }
@@ -1102,29 +1086,22 @@ std::string get_current_date_and_time(std::string directory) {
       - If play was unsuccessful with some attempts remaining:
         Update game file */
 void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req) {
-    // printf("\n\nStarting treat_play\n");
     std::string message = RWG;
     message.push_back(' ');
-    // printf("message is currently\n%s\n", message.c_str());
 
     /* Look for active games with req->PLID */
-    // printf("Treat play: Checking for valid PLID\n");
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
         /* Send error message */
-        // printf("treat_play: Invalid PLID. Sending error message\n");
         report_error(fd, addr, addrlen, req);
-        // printf("treat_play: Error message sent\n");
 
         return;
     }
 
     /* Compare number of moves to req->trials */
-    // printf("treat_play: Comparing trial numbers\n");
-    int move_number = get_move_number(req);
-    std::string moves = " " + std::to_string(move_number) + "\n";
-    if (req->trial != std::to_string(move_number)) {
+    std::string move_number = get_game_trials(req);
+    std::string moves = " " + move_number + "\n";
+    if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
-        printf("treat_play: They don't match! Player sent %s and server had %s\n", req->trial, std::to_string(move_number));
         message = message + INV + moves;
         send_message(fd, message.c_str(), message.length(), addr, addrlen);
         return;
@@ -1145,11 +1122,9 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
 
     if (!(positions((req->letter_word).front(), word).empty())) { // Some positions were found
         /* Prepare reply for client and update game file */
-        // printf("treat_play: Some positions found\n%s\n", positions((req->letter_word).front(), word).c_str());
         update_game(req);
         if (won_game(req)) {
             /* Won the game */
-            // printf("treat_play: Game won\n");
             message = message + WIN + "\n";
             move_to_SCORES(req, W);
 
@@ -1158,51 +1133,55 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
         else {
             /* Simply guessed a correct letter*/
             message = message + OK + moves + " ";
-            //message.pop_back(); // Remove \n from moves
             message = message + positions((req->letter_word).front(), word) + "\n";
-            //printf("message is currently\n%s\n", message.c_str());
         }
     }
     else { /* Wrong guess */
-        //printf("treat_play: Wrong guess motherfucker\n");
         increment_game_error(req);
         increment_game_trials(req);
         if (get_game_errors(req) == max_tries(word)) { // No more errors
             /* Prepare reply for client */
-            // printf("treat_play: No more tries\n");
             message = message + OVR + moves;
             move_to_SCORES(req, F);
         }
         else { // Incorrect guess, but with remaining attempts
             /* Prepare reply for client */
-            // printf("treat_play: You still have some tries\n");
             message = message + NOK + moves;
         }
     }
-    // printf("treat_play: The message being sent is\n%s\n", message.c_str());
+    printf("treat_play: The message being sent is\n%s\n", message.c_str());
     send_message(fd, message.c_str(), message.length(), addr, addrlen);
 
 }
 
 /* Positions:
-    Returns the positions in "word" where the character "letter" appears */
+    Returns a string with the number of occurences of "letter" in "word",
+    followed by the numerical positions in "word" where the character "letter" 
+    appears */
 std::string positions(char letter, std::string word) {
 
     std::string output;
     int pos = 1;
     int length = word.length();
+    int number_occ = 0;
     for (int i = 0; i < length; i++) {
         if (word[i] == letter) {
             output = output + std::to_string(pos) + " ";
+            number_occ++;
         }
         pos++;
     }
-    if (output.empty()) {
+    if (number_occ == 0) {
         return output;
     }
 
     /* Remove last space */
     output.pop_back();
+
+    /* Add number of matches to the start of the string */
+    output = std::to_string(number_occ) + " " + output;
+
+    //printf("O vetor positions é (%s)\n", output.c_str());
 
     return output;
 }
@@ -1282,6 +1261,17 @@ std::string get_game_errors(struct request *req) {
     struct game *g = it->second;
 
     return std::to_string(g->errors);
+}
+
+/* Get Game Trials 
+
+    Getter function for the "move_number" attribute of the struct game indexed by
+    req->PLID  */
+std::string get_game_trials(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    return g->move_number;
 }
 
 
