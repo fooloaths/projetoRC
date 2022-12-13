@@ -913,7 +913,7 @@ int compare_plays(struct request *req, std::string line) {
     i++; // Skip space
 
     std::string word;
-    while (line[i] != '\0' || line[i] != '\n') {
+    while (line[i] != '\0' && line[i] != '\n') {
         word.push_back(line[i]);
         i++;
     }
@@ -1108,6 +1108,13 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
 
         // TODO analisar se aqui é para registar no ficheiro / incrementar erros
     }
+    if (check_for_duplicate_move(req) == 0) {
+        /* If this move had already been played */
+        message = message + DUP + moves;
+        send_message(fd, message.c_str(), message.length(), addr, addrlen);
+        return;
+    }
+
     moves.pop_back(); /* Remove \n */
 
     /* Compare res->word to the word */
