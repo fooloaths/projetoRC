@@ -28,9 +28,9 @@ Mateus Pinho - ist199282
 #include <fstream>
 
 /* Global variables */
-int move_number = 1;
+int move_number;
 std::string player_id;
-std::string word = "";
+std::string word;
 
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 void receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
@@ -43,6 +43,9 @@ std::string format_word(std::string word_to_format = word);
 void scoreboard(const char* server_ip, const char* server_port);
 int guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in addr);
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr);
+void status(const char* server_ip, const char* server_port);
+void status_aux_ok(const char* message);
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
@@ -99,6 +102,8 @@ int main(int argc, char *argv[]) {
             scoreboard(server_ip, server_port);
         } else if (command == "rev") {
             reveal_word(fd, res, addr);
+        } else if (command == "state" || command == "st") {
+            status(server_ip, server_port);
         } else {
             std::cout << "Input Error: Invalid command.\n";
         }
@@ -151,14 +156,16 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
     }
 }   
 
-
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     player_id = id;
+    move_number = 1;
     std::string message = SNG + id + "\n";
     char buffer[BLOCK_SIZE] = {0};
+    word = "";
     
     send_message(fd, message.c_str(), message.length(), res);
     // // std::cerr << "start_new_game: Buffer before receiving message: " << buffer << std::endl;
+
     receive_message(fd, addr, buffer, BLOCK_SIZE);  
     // // std::cerr << "start_new_game: Buffer after receiving message: " << buffer << std::endl;
     std::string response = buffer;
@@ -175,8 +182,8 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     // TODO fix input splitting
     std::string status = get_status(response);
     if (status != OK) {     
-        std::cout << "el servidor no esta muy bueno ya?\n";
-        exit(1);
+        std::cout << "YOU CAN'T DO THAT!! THERE'S A GAME GOING ON!\n";
+        return;
     }
 
     std::string n_letters = response.substr(response.find(' ', response.find(' ') + 1) + 1, response.find(' ', response.find(' ', response.find(' ') + 1) + 1));
@@ -364,15 +371,13 @@ void scoreboard_aux_ok(const char* message) {
     // split the string into two strings after the first space
     std::string scoreboard = message;
     scoreboard = scoreboard.substr(scoreboard.find(' ', scoreboard.find(' ') + 1) + 1, scoreboard.length());
-
     // scoreboard until the first space is file name
     std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
     // file_size is between the first space and the first space
-    auto file_size = scoreboard.erase(0, file_name.length() + 1);
-    std::string file_size_str = file_size.substr(0, file_size.find(' '));
     auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
-    // useful_info is the rest of the string
-    printf("SCOREBOARD:%s", useful_info.c_str());
+    // remove newline from file
+    useful_info = useful_info.substr(useful_info.find('-'), useful_info.length()); 
+    std::cout << useful_info;
     
     // create new file named file_name with file_size bytes and write useful_info into it
     std::ofstream file(file_name);
@@ -381,13 +386,25 @@ void scoreboard_aux_ok(const char* message) {
 }
 
 void scoreboard(const char* server_ip, const char* server_port) {
+    std::string message = "GSB\n";
+    auto response = tcp_helper(message, server_ip, server_port);
+    const char* buf = response.c_str();
+
+    std::string status = get_status(buf);
+    if (status.compare(OK) == 0) {
+        scoreboard_aux_ok(buf);
+    } else {
+        printf("The scoreboard is empty!\n");
+    }
+}
+
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port) {
     int fd, errorcode;
     ssize_t n;
     struct addrinfo hints, *res;
     std::string buffer;
     char byte[1];
-    std::string message = "GSB\n";
-
+    
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         close(fd);
@@ -412,6 +429,7 @@ void scoreboard(const char* server_ip, const char* server_port) {
         exit(1);
     }
 
+    // TODO byte by byte writes
     n = write(fd, message.c_str(), message.length());
     if (n == -1) {
         freeaddrinfo(res);
@@ -419,7 +437,7 @@ void scoreboard(const char* server_ip, const char* server_port) {
         exit(1);
     }
 
-    // read byte by byte until \n
+    // read BLOCK_SIZE blocks until \n
     while (byte[0] != '\n') {
         n = read(fd, byte, 1);
         if (n == -1) {
@@ -431,29 +449,75 @@ void scoreboard(const char* server_ip, const char* server_port) {
     }
 
     std::string response = buffer;
-    // remove all characters after the first \n
-    response = response.substr(0, response.find('\n') + 1);
-    const char* buf = response.c_str();
+    // number of digits is after the third space and the next \n
+    size_t digits = (size_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
 
-    printf("response: %s", buf);
-
-    std::string status = get_status(buf);
-    if (status.compare(OK) == 0) {
-        scoreboard_aux_ok(buf);
-    } else {
-        printf("The scoreboard is empty!\n");
+    // create file_data vector with digits size
+    std::vector <char> file_data(digits);
+    
+    n = read(fd, &file_data[0], digits);
+    if (n == -1) {
+        freeaddrinfo(res);
+        close(fd);
+        exit(1);
     }
+
+    // append file_data to response
+    response.append(file_data.begin(), file_data.end());
     
     freeaddrinfo(res);
     close(fd);
+
+    return response;
+}
+
+void status(const char* server_ip, const char* server_port) {
+    std::string message = "STA " + player_id + "\n";
+    auto response = tcp_helper(message, server_ip, server_port);
+    const char* buf = response.c_str();
+    
+    std::string status = get_status(buf);
+    if (status.compare("ACT") == 0) {
+        status_aux_ok(buf);
+    } else if (status.compare("NOK") == 0) {
+        std::cout << "No games found.\n";
+    } else {
+        status_aux_ok(buf);
+        exit(1);
+    }
+}
+
+void status_aux_ok(const char* message) {
+    // split the string into two strings after the first tab
+    std::string status = message;
+    status = status.substr(status.find("     ") + 1, status.length());
+    // remove all occurrences of "     " in the string
+    while (status.find("     ") != std::string::npos) {
+        status.erase(status.find("     "), 5);
+    }
+    std::cout << status;
 }
 
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
-    std::string message = "QUT " + id + '\n';
+    auto inner_id = id;
+    if (player_id.empty()) {
+        std::cout << "You haven't started a game yet!!!\n";
+        return 1;
+    }
 
+    for (auto i : id) {
+        if (!isdigit(i)) {
+            inner_id = player_id;
+            break;
+        }
+    }
+    
+    std::string message = "QUT " + inner_id + '\n';
     send_message(fd, message.c_str(), message.length(), res);
+    // // std::cerr << "sent message: " << message << std::endl;
+
     receive_message(fd, addr, buffer, buf_size);
 
     std::string response = buffer;
