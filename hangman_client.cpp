@@ -375,9 +375,9 @@ void scoreboard_aux_ok(const char* message) {
     std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
     // file_size is between the first space and the first space
     auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
-    // TODO remove newline from file
-    useful_info = useful_info.substr(1, useful_info.length()); 
-    std::cout << "SB" << useful_info;
+    // remove newline from file
+    useful_info = useful_info.substr(useful_info.find('-'), useful_info.length()); 
+    std::cout << useful_info;
     
     // create new file named file_name with file_size bytes and write useful_info into it
     std::ofstream file(file_name);
@@ -404,7 +404,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     struct addrinfo hints, *res;
     std::string buffer;
     char byte[1];
-
+    
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         close(fd);
@@ -452,15 +452,18 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     // number of digits is after the third space and the next \n
     size_t digits = (size_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
 
-    char file_data[2000] = {0};
-    n = read(fd, file_data, digits);
+    // create file_data vector with digits size
+    std::vector <char> file_data(digits);
+    
+    n = read(fd, &file_data[0], digits);
     if (n == -1) {
         freeaddrinfo(res);
         close(fd);
         exit(1);
     }
 
-    response.append(file_data);
+    // append file_data to response
+    response.append(file_data.begin(), file_data.end());
     
     freeaddrinfo(res);
     close(fd);
@@ -476,9 +479,11 @@ void status(const char* server_ip, const char* server_port) {
     std::string status = get_status(buf);
     if (status.compare("ACT") == 0) {
         status_aux_ok(buf);
+    } else if (status.compare("NOK") == 0) {
+        std::cout << "No games found.\n";
     } else {
         status_aux_ok(buf);
-        return;
+        exit(1);
     }
 }
 
