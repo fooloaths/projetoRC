@@ -44,7 +44,9 @@ void scoreboard(const char* server_ip, const char* server_port);
 int guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in addr);
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr);
 void status(const char* server_ip, const char* server_port);
+void hint(const char* server_ip, const char* server_port);
 void status_aux_ok(const char* message);
+void hint_aux_ok(const char* message);
 std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
 
 int main(int argc, char *argv[]) {
@@ -104,7 +106,9 @@ int main(int argc, char *argv[]) {
             reveal_word(fd, res, addr);
         } else if (command == "state" || command == "st") {
             status(server_ip, server_port);
-        } else {
+        } else if (command == "hint" || command == "h") {
+            hint(server_ip, server_port);
+        } else{
             std::cout << "Input Error: Invalid command.\n";
         }
     }
@@ -398,12 +402,48 @@ void scoreboard(const char* server_ip, const char* server_port) {
     }
 }
 
+void hint_aux_ok(std::string status) {
+    // file_name is between the second space and the third space
+    auto second_space = status.find(' ', status.find(' ') + 1) + 1;
+    auto third_space = status.find(' ', second_space) + 1;
+    auto fourth_space = status.find(' ', third_space) + 1;
+    auto length = third_space - second_space;
+    auto file_name = status.substr(second_space, length);
+
+    // everything after the fourth space is the useful info
+    auto useful_info = status.substr(fourth_space);
+
+    std::cerr << "useful_info size is " << useful_info.size() << std::endl;
+    // remove newline from file
+
+    // create a new image file with the name file_name and write useful_info into it
+    std::ofstream file(file_name);
+    file << useful_info;
+    file.close();
+}
+
+void hint(const char *server_ip, const char *server_port) {
+    std::string message = "GHL " + player_id + "\n";
+    auto response = tcp_helper(message, server_ip, server_port);
+    const char* buf = response.c_str();
+
+    std::cerr << "response size is " << response.size() << std::endl;
+
+    std::string status = get_status(buf);
+    if (status.compare(OK) == 0) {
+        hint_aux_ok(response);
+    } else {
+        printf("ERROR!!!\n");
+    }
+}
+
 std::string tcp_helper(std::string message, const char* server_ip, const char* server_port) {
     int fd, errorcode;
     ssize_t n;
     struct addrinfo hints, *res;
     std::string buffer;
     char byte[1];
+    char file_data[BLOCK_SIZE];
     
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -450,20 +490,29 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 
     std::string response = buffer;
     // number of digits is after the third space and the next \n
-    size_t digits = (size_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
-
-    // create file_data vector with digits size
-    std::vector <char> file_data(digits);
+    ssize_t digits = (ssize_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
     
-    n = read(fd, &file_data[0], digits);
-    if (n == -1) {
-        freeaddrinfo(res);
-        close(fd);
-        exit(1);
-    }
+    // read digits bytes into file_data vector in increments of BLOCK_SIZE
+    while (digits > 0) {
+        auto to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
+        std::cerr << "I'm gonna try and read " << to_read << std::endl;
+        n = read(fd, file_data, (size_t) to_read);
 
-    // append file_data to response
-    response.append(file_data.begin(), file_data.end());
+        std::cerr << "I read" << n << std::endl;
+        if (n == -1) {
+            freeaddrinfo(res);
+            close(fd);
+            exit(1);
+        }
+        if (n == 0) {
+            break;
+        }
+        digits -= n;
+        file_data[to_read] = '\0';
+        response.append(file_data);
+
+        
+    }
     
     freeaddrinfo(res);
     close(fd);
