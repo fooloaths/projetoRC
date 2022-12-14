@@ -37,7 +37,7 @@ void receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
 void send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 std::string get_status(std::string message);
-std::string play_aux_ok(const char* message, std::string letter);
+std::string play_aux_ok(std::string message, std::string letter);
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in add);
 std::string format_word(std::string word_to_format = word);
 void scoreboard(const char* server_ip, const char* server_port);
@@ -45,8 +45,8 @@ int guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in add
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr);
 void status(const char* server_ip, const char* server_port);
 void hint(const char* server_ip, const char* server_port);
-void status_aux_ok(const char* message);
-void hint_aux_ok(const char* message);
+void status_aux_ok(std::string message);
+void hint_aux_ok(std::string message);
 std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
 
 int main(int argc, char *argv[]) {
@@ -147,9 +147,8 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
     std::string response = buffer;
     // remove all characters after \n
     response = response.substr(0, response.find('\n') + 1);
-    auto buf = response.c_str();
 
-    std::string status = get_status(buf);
+    std::string status = get_status(response);
     if (status == "OK") {
         exit(1);
     } else if (status == "ERR") {
@@ -255,8 +254,7 @@ std::string play_win_ok(std::string letter) {
     return word;
 }
 
-std::string play_aux_ok(const char* message, std::string letter) {
-    std::string word_pos = message;
+std::string play_aux_ok(std::string word_pos, std::string letter) {
     // TODO fix input splitting
     word_pos.pop_back();
     word_pos = word_pos.substr(word_pos.find(' ', word_pos.find(' ', word_pos.find(' ') + 1) + 1) + 1, word_pos.length());
@@ -293,7 +291,6 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
     char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     std::string response = "";
-    const char* buf;
 
     while (response == "") {
         // Send message
@@ -304,10 +301,9 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
         response = buffer;
         // remove all characters after \n
         response = response.substr(0, response.find('\n') + 1);
-        buf = response.c_str();
     }
 
-    std::string status = get_status(buf);
+    std::string status = get_status(response);
     move_number++;
     if (status.compare(WIN) == 0) {
         printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", 
@@ -329,7 +325,6 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     std::string response = "";
-    const char* buf;
 
     if (letter.length() != 1 || !isalpha(letter[0])) {
         printf("Error (play): The letter must be a single character.\n");
@@ -344,13 +339,12 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
         response = buffer;
         // remove all characters after the first \n
         response = response.substr(0, response.find('\n') + 1);
-        buf = response.c_str();
     }
 
-    std::string status = get_status(buf);
+    std::string status = get_status(response);
     move_number++;
     if (status.compare(OK) == 0) {
-        word = play_aux_ok(buf, letter);
+        word = play_aux_ok(response, letter);
         printf("YOU ARE RIGHT!!! THE WORD NOW IS %s\n", format_word().c_str());
     } else if (status.compare(WIN) == 0) {
         word = play_win_ok(letter);
@@ -371,9 +365,8 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     return 0;
 }
 
-void scoreboard_aux_ok(const char* message) {
+void scoreboard_aux_ok(std::string scoreboard) {
     // split the string into two strings after the first space
-    std::string scoreboard = message;
     scoreboard = scoreboard.substr(scoreboard.find(' ', scoreboard.find(' ') + 1) + 1, scoreboard.length());
     // scoreboard until the first space is file name
     std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
@@ -392,11 +385,10 @@ void scoreboard_aux_ok(const char* message) {
 void scoreboard(const char* server_ip, const char* server_port) {
     std::string message = "GSB\n";
     auto response = tcp_helper(message, server_ip, server_port);
-    const char* buf = response.c_str();
 
-    std::string status = get_status(buf);
+    std::string status = get_status(response);
     if (status.compare(OK) == 0) {
-        scoreboard_aux_ok(buf);
+        scoreboard_aux_ok(response);
     } else {
         printf("The scoreboard is empty!\n");
     }
@@ -413,7 +405,6 @@ void hint_aux_ok(std::string status) {
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
 
-    std::cerr << "useful_info size is " << useful_info.size() << std::endl;
     // remove newline from file
 
     // create a new image file with the name file_name and write useful_info into it
@@ -425,11 +416,8 @@ void hint_aux_ok(std::string status) {
 void hint(const char *server_ip, const char *server_port) {
     std::string message = "GHL " + player_id + "\n";
     auto response = tcp_helper(message, server_ip, server_port);
-    const char* buf = response.c_str();
 
-    std::cerr << "response size is " << response.size() << std::endl;
-
-    std::string status = get_status(buf);
+    std::string status = get_status(response);
     if (status.compare(OK) == 0) {
         hint_aux_ok(response);
     } else {
@@ -495,10 +483,8 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     // read digits bytes into file_data vector in increments of BLOCK_SIZE
     while (digits > 0) {
         auto to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
-        std::cerr << "I'm gonna try and read " << to_read << std::endl;
         n = read(fd, file_data, (size_t) to_read);
 
-        std::cerr << "I read" << n << std::endl;
         if (n == -1) {
             freeaddrinfo(res);
             close(fd);
@@ -510,8 +496,6 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
         digits -= n;
         file_data[to_read] = '\0';
         response.append(file_data);
-
-        
     }
     
     freeaddrinfo(res);
@@ -523,22 +507,20 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 void status(const char* server_ip, const char* server_port) {
     std::string message = "STA " + player_id + "\n";
     auto response = tcp_helper(message, server_ip, server_port);
-    const char* buf = response.c_str();
     
-    std::string status = get_status(buf);
+    std::string status = get_status(response);
     if (status.compare("ACT") == 0) {
-        status_aux_ok(buf);
+        status_aux_ok(response);
     } else if (status.compare("NOK") == 0) {
         std::cout << "No games found.\n";
     } else {
-        status_aux_ok(buf);
+        status_aux_ok(response);
         exit(1);
     }
 }
 
-void status_aux_ok(const char* message) {
+void status_aux_ok(std::string status) {
     // split the string into two strings after the first tab
-    std::string status = message;
 
     // file_name is between the second space and the third space
     auto second_space = status.find(' ', status.find(' ') + 1) + 1;
@@ -583,9 +565,8 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
     std::string response = buffer;
     // remove all characters after the first \n
     response = response.substr(0, response.find('\n') + 1);
-    const char* buf = response.c_str();
 
-    std::string status = get_status(buf);
+    std::string status = get_status(response);
     if (status.compare(OK) == 0) {
         printf("GOODBYE :3\n");
     } else {
