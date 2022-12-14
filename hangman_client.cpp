@@ -402,10 +402,7 @@ void scoreboard(const char* server_ip, const char* server_port) {
     }
 }
 
-void hint_aux_ok(const char* message) {
-    // split the string into two strings after the first tab
-    std::string status = message;
-
+void hint_aux_ok(std::string status) {
     // file_name is between the second space and the third space
     auto second_space = status.find(' ', status.find(' ') + 1) + 1;
     auto third_space = status.find(' ', second_space) + 1;
@@ -415,9 +412,9 @@ void hint_aux_ok(const char* message) {
 
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
-    // remove newline from file 
-    std::cout << useful_info;
 
+    std::cerr << "useful_info size is " << useful_info.size() << std::endl;
+    // remove newline from file
 
     // create a new image file with the name file_name and write useful_info into it
     std::ofstream file(file_name);
@@ -430,9 +427,11 @@ void hint(const char *server_ip, const char *server_port) {
     auto response = tcp_helper(message, server_ip, server_port);
     const char* buf = response.c_str();
 
+    std::cerr << "response size is " << response.size() << std::endl;
+
     std::string status = get_status(buf);
     if (status.compare(OK) == 0) {
-        hint_aux_ok(buf);
+        hint_aux_ok(response);
     } else {
         printf("ERROR!!!\n");
     }
@@ -495,9 +494,9 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     
     // read digits bytes into file_data vector in increments of BLOCK_SIZE
     while (digits > 0) {
-        int to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
+        auto to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
         std::cerr << "I'm gonna try and read " << to_read << std::endl;
-        n = read(fd, file_data, to_read);
+        n = read(fd, file_data, (size_t) to_read);
 
         std::cerr << "I read" << n << std::endl;
         if (n == -1) {
@@ -505,13 +504,14 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
             close(fd);
             exit(1);
         }
+        if (n == 0) {
+            break;
+        }
         digits -= n;
         file_data[to_read] = '\0';
         response.append(file_data);
 
-        if (n == 0) {
-            break;
-        }
+        
     }
     
     freeaddrinfo(res);

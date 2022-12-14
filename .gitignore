@@ -42,8 +42,8 @@
 *.idb
 *.pdb
 *.dump
-TOPSCORES*
-STATE*
+TOPSCORES_*
+STATE_*
 
 # Kernel Module Compile Results
 *.mod*
