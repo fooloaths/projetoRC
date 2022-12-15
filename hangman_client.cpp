@@ -405,12 +405,18 @@ void hint_aux_ok(std::string status) {
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
 
-    // remove newline from file
+    useful_info.pop_back();
+    std::cout << useful_info << std::endl;
 
-    // create a new image file with the name file_name and write useful_info into it
-    std::ofstream file(file_name);
-    file << useful_info;
-    file.close();
+    // // // remove newline from file
+    // // useful_info.pop_back();
+    
+    // // // create a new image file with the name file_name and write useful_info into it
+    // // std::ofstream file(file_name);
+    // // file.write(useful_info.c_str(), useful_info.length());
+    // // file.close();
+
+    std::cout << "The hint is in the file " << file_name << std::endl;
 }
 
 void hint(const char *server_ip, const char *server_port) {
@@ -492,6 +498,9 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
         }
         if (n == 0) {
             break;
+        }
+        if (n < to_read) {
+            to_read = n;
         }
         digits -= n;
         file_data[to_read] = '\0';
