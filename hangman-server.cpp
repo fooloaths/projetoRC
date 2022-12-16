@@ -77,7 +77,7 @@ std::string positions(char letter, std::string word);
 void record_move_for_active_game(struct request *req);
 int compare_plays(struct request *req, std::string line);
 int get_move_number(struct request *req);
-char* get_word_and_hint(struct request *req);
+char* get_word_and_hint(std::string file_path);
 int check_for_active_game(struct request *req);
 std::string get_current_date_and_time(std::string directory);
 void update_game(struct request *req);
@@ -147,30 +147,30 @@ int main(int argc, char **argv) {
 
     // int pid = fork();
     // if (pid != 0) { /* Parent process */
-        /* UDP server */
-        // fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
-        // if (fd == -1) {
-            // printf("Error (main): An error occured while attempting to create an UDP socket\n");
-            // exit(1);
-        // }
-        // fp_word_file = fopen(word_file.c_str(), "r");
-        // if (fp_word_file == NULL) {
-            // printf("Error (main): Couldn't open word file.\n");
-            // if (errno == EACCES) {
-    //             printf("    EACCES: Not enough permissions to open file\n");
-    //         }
-    //         /* Close socket and free resources */
-    //         freeaddrinfo(res);
-    //         close(fd);
+    //     /* UDP server */
+        //   fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
+        //   if (fd == -1) {
+        //       printf("Error (main): An error occured while attempting to create an UDP socket\n");
+        //       exit(1);
+        //   }
+        //   fp_word_file = fopen(word_file.c_str(), "r");
+        //   if (fp_word_file == NULL) {
+        //       printf("Error (main): Couldn't open word file.\n");
+        //       if (errno == EACCES) {
+        //           printf("    EACCES: Not enough permissions to open file\n");
+        //       }
+        //      /* Close socket and free resources */
+        //       freeaddrinfo(res);
+        //       close(fd);
 
-    //         return -1;
-    //     }
-    //     srand(SEED); /* Set seed for random num generator */
-    //     udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    // }
+        //      return -1;
+        //   }
+        //  srand(SEED); /* Set seed for random num generator */
+        //  udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
+    //  }
     // else {
         /* TCP server */
-        fd = socket(AF_INET,SOCK_STREAM,0); //TCP socket
+        fd = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
         if (fd == -1) {
             printf("Error (main): An error occured while attempting to create an TCP socket\n");
             exit(1);
@@ -190,6 +190,7 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     hints.ai_socktype = SOCK_DGRAM; // UDP socket
     hints.ai_flags = AI_PASSIVE;
 
+    printf("olá\n");
     errorcode = getaddrinfo(NULL, PORT, &hints, &res);
     if (errorcode != 0) {
         printf("Error (udp_server): An error occured while getting an addrinfo structure\n");
@@ -206,12 +207,15 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     while (1) {
         /* Read requests from UDP socket */
         addrlen = sizeof(addr);
+        printf("reeeading\n");
         n = recvfrom(fd,buffer, BLOCK_SIZE,0, (struct sockaddr*) &addr, &addrlen);
         if (n == -1) {
             printf("Error (udp_server): An error occured while trying to receive a message from the UDP socket\n");
             exit(1);
         }
 
+        printf("aaaaaaaaa\n");
+        printf("buffer = %s", buffer);
         struct request *req = process_input(buffer);
         if (req == NULL) {
             printf("Error (udp_server): Couldn't allocate memory to process request\n");
@@ -646,7 +650,7 @@ void treat_state(struct request *req, int fd) {
             status = NOK;
 
             /* Reply to client */
-            message = message + status + "\n";
+            message = message + " " + status + "\n";
             printf("treat_state: Sending message: %s", message.c_str());
             ssize_t n = write(fd, message.c_str(), message.length());
             if (n == -1) {
@@ -660,6 +664,7 @@ void treat_state(struct request *req, int fd) {
         printf("treat_state: A game was found!!!\n");
         std::string path = ACTIVE_GAME_PATH + req->PLID + TXT;
         sprintf(game_path, "%s", path.c_str());
+        status = ACT;
     }
 
     /* Create temporary state file */
@@ -670,7 +675,7 @@ void treat_state(struct request *req, int fd) {
     printf("treat_start: Opening file %s for reading\n", file_name.c_str());
 
 
-    message = message + status + " " + file_name + " " + std::to_string(file_size) + "\t";
+    message = message + " " + status + " " + file_name + " " + std::to_string(file_size) + "     ";
     printf("treat_start: Message is currently %s\n", message.c_str());
 
     std::string content;
@@ -695,10 +700,9 @@ void treat_state(struct request *req, int fd) {
     }
 
     /* Delete temp file */
-    // std::string delete_command = "rm ";
-    // delete_command = delete_command + file_name;
-    // printf("treat_start: Sending %s to delete temporary file\n", delete_command);
-    // system(delete_command.c_str());
+    std::string delete_command = "rm ";
+    delete_command = delete_command + file_name;
+    system(delete_command.c_str());
 }
 
 /* Create Temporary State File:
@@ -730,7 +734,7 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
 
     /* Exctract word and hint from game file */ // TODO esta parte ainda só funciona se for um active game file
     printf("\ncreate_temporary_state_file: Gettind word and hint\n");
-    std::string word_and_hint = get_word_and_hint(req);
+    std::string word_and_hint = get_word_and_hint(fname);
     std::string word = get_word(word_and_hint);
     printf("\ncreate_temporary_state_file: The word is %s\n", word.c_str());
     std::string hint = get_hint(word_and_hint);
@@ -1016,7 +1020,8 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     }
 
     /* Compare res->word to the word */
-    char *line = get_word_and_hint(req);
+    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+    char *line = get_word_and_hint(file_path);
     std::string word = get_word(line);
     free(line);
 
@@ -1330,8 +1335,7 @@ int compare_plays(struct request *req, std::string line) {
     Opens an active game file for that player and reads the first line (the
     line containing the word to be guessed and the name of the hint file).
     Returns that line */
-char* get_word_and_hint(struct request *req) {
-    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+char* get_word_and_hint(std::string file_path) {
 
     /* Open file for reading */
     FILE *file;
@@ -1426,16 +1430,19 @@ void move_to_SCORES(struct request *req, char code) {
     any server side information regarding the active game is freed and 
     the game file is moved */
 void treat_quit(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req) {
-
+    printf("aaasdfasfasdasd\n");
     std::string message = RQT;
     message.push_back(' ');
     std::string status;
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
         /* No active game or invalid PLID */
+        printf("no game?!?!\n");
+        move_to_SCORES(req, Q);
         status = ERR;
     }
     else {
         /* Close game and move file to SCORES */
+        printf("Game found\n");
         move_to_SCORES(req, Q);
         status = OK;
     }
@@ -1523,7 +1530,8 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     moves.pop_back(); /* Remove \n */
 
     /* Compare res->word to the word */
-    char *line = get_word_and_hint(req);
+    std::string file_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
+    char *line = get_word_and_hint(file_path);
     std::string word = get_word(line);
     free(line);
 

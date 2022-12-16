@@ -40,11 +40,12 @@
 #define TXT ".txt"
 #define LAST_GAME_MSG "Last finalized game for player "
 #define ACTIVE_GAME_FOUND "Active game found for player "
-#define TRANSACTIONS_MSG " Transactions found: "
+#define TRANSACTIONS_MSG "--- Transactions found: "
 #define LETTER_TRIAL "Letter trial: "
 #define TERMINATION "Termination: "
 #define WORD_GUESS "Word guess: "
 #define CURRENTLY_SOLVED "Solved so far: "
+#define APAGAR_DEPOIS "12_"
 
 #define FALSE 0
 #define TRUE 1
