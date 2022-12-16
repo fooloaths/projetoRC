@@ -25,6 +25,7 @@ Mateus Pinho - ist199282
 #include <unistd.h>
 #include <iostream>
 #include <vector>
+#include <sstream>
 #include <fstream>
 
 /* Global variables */
@@ -47,7 +48,7 @@ void status(const char* server_ip, const char* server_port);
 void hint(const char* server_ip, const char* server_port);
 void status_aux_ok(std::string message);
 void hint_aux_ok(std::string message);
-std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
+std::stringstream tcp_helper(std::string message, const char* server_ip, const char* server_port, bool is_file = false);
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
@@ -384,7 +385,7 @@ void scoreboard_aux_ok(std::string scoreboard) {
 
 void scoreboard(const char* server_ip, const char* server_port) {
     std::string message = "GSB\n";
-    auto response = tcp_helper(message, server_ip, server_port);
+    auto response = tcp_helper(message, server_ip, server_port).str();
 
     std::string status = get_status(response);
     if (status.compare(OK) == 0) {
@@ -404,18 +405,23 @@ void hint_aux_ok(std::string status) {
 
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
-
+    // // useful_info = useful_info.substr(0, useful_info.length() - 1);
     // remove newline from file
+    useful_info.pop_back();
 
     // create a new image file with the name file_name and write useful_info into it
     std::ofstream file(file_name);
     file << useful_info;
     file.close();
+
+    std::cout << "The hint is in the file " << file_name << std::endl;
 }
 
 void hint(const char *server_ip, const char *server_port) {
     std::string message = "GHL " + player_id + "\n";
-    auto response = tcp_helper(message, server_ip, server_port);
+
+    // !! the server will send the hint in the form of a file
+    auto response = tcp_helper(message, server_ip, server_port, true).str();
 
     std::string status = get_status(response);
     if (status.compare(OK) == 0) {
@@ -425,14 +431,14 @@ void hint(const char *server_ip, const char *server_port) {
     }
 }
 
-std::string tcp_helper(std::string message, const char* server_ip, const char* server_port) {
+std::stringstream tcp_helper(std::string message, const char* server_ip, const char* server_port, bool is_file) {
     int fd, errorcode;
     ssize_t n;
     struct addrinfo hints, *res;
-    std::string buffer;
+    std::stringstream buffer;
     char byte[1];
     char file_data[BLOCK_SIZE];
-    
+
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
         close(fd);
@@ -467,47 +473,52 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 
     // read BLOCK_SIZE blocks until \n
     while (byte[0] != '\n') {
-        n = read(fd, byte, 1);
+        n = read(fd, byte, 1);  
         if (n == -1) {
             freeaddrinfo(res);
             close(fd);
             exit(1);
         }
-        buffer.push_back(byte[0]);
+        buffer << byte[0];
     }
 
-    std::string response = buffer;
+    auto response = buffer.str();
     // number of digits is after the third space and the next \n
     ssize_t digits = (ssize_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
-    
+
     // read digits bytes into file_data vector in increments of BLOCK_SIZE
     while (digits > 0) {
         auto to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
-        n = read(fd, file_data, (size_t) to_read);
+        memset(file_data, 0, BLOCK_SIZE);
+        n = read(fd, file_data, to_read);
 
         if (n == -1) {
             freeaddrinfo(res);
             close(fd);
             exit(1);
         }
+        if (n < to_read) {
+                to_read = n;
+        } 
+
+        digits -= n;
+        buffer.write(file_data, to_read);
+
         if (n == 0) {
             break;
         }
-        digits -= n;
-        file_data[to_read] = '\0';
-        response.append(file_data);
     }
     
     freeaddrinfo(res);
     close(fd);
 
-    return response;
+    return buffer;
 }
 
 void status(const char* server_ip, const char* server_port) {
     std::string message = "STA " + player_id + "\n";
-    auto response = tcp_helper(message, server_ip, server_port);
-    
+    auto response = tcp_helper(message, server_ip, server_port).str();
+
     std::string status = get_status(response);
     if (status.compare("ACT") == 0) {
         status_aux_ok(response);
@@ -558,7 +569,6 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
     
     std::string message = "QUT " + inner_id + '\n';
     send_message(fd, message.c_str(), message.length(), res);
-    // // std::cerr << "sent message: " << message << std::endl;
 
     receive_message(fd, addr, buffer, buf_size);
 
