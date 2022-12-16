@@ -628,7 +628,7 @@ void treat_state(struct request *req, int fd) {
 
     int i = 0;
     std::string status;
-    std::string message = RST; message.push_back(' ');
+    std::string message = RST;
     printf("treat_state: Message is currently: %s\n", message.c_str());
     int found = check_for_active_game(req);
     char game_path[FINISHEd_GAME_PATH_SIZE]; // TODO check this constant
@@ -668,16 +668,22 @@ void treat_state(struct request *req, int fd) {
     /* Send temp file to client */
     std::string file_name = STATE + req->PLID + TXT;
     printf("treat_start: Opening file %s for reading\n", file_name.c_str());
-    FILE *file = fopen(file_name.c_str(), "r");
 
-    message = message + status + " " + file_name + " " + std::to_string(file_size) + " ";
+
+    message = message + status + " " + file_name + " " + std::to_string(file_size) + "\t";
     printf("treat_start: Message is currently %s\n", message.c_str());
-    char c;
-    while ((c = fgetc(file)) != EOF) { /* Append file's content to message */
-        message.push_back(c);
+
+    std::string content;
+    std::ifstream file;
+    file.open(file_name.c_str());
+
+    while (getline (file, content)) {
+        content.push_back('\n');
+        message = message + content;
     }
+    file.close();
+
     printf("treat_start: Message being sent is\n%s", message.c_str());
-    fclose(file);
 
     /* Send reply */
     ssize_t n = write(fd, message.c_str(), message.length());
@@ -689,10 +695,10 @@ void treat_state(struct request *req, int fd) {
     }
 
     /* Delete temp file */
-    std::string delete_command = "rm ";
-    delete_command = delete_command + file_name;
-    printf("treat_start: Sending %s to delete temporary file\n", delete_command);
-    system(delete_command.c_str());
+    // std::string delete_command = "rm ";
+    // delete_command = delete_command + file_name;
+    // printf("treat_start: Sending %s to delete temporary file\n", delete_command);
+    // system(delete_command.c_str());
 }
 
 /* Create Temporary State File:
@@ -762,6 +768,9 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
 
     size_t n = write_to_temp_file(state_file, trials, word, hint, req, game_found, fname);
 
+    fclose(game_file);
+    fclose(state_file);
+
     // TODO se for um jogo ativo, ir buscar word knowledge
 
     return n;
@@ -798,18 +807,23 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
     }
 
     /* Write nº of transactions */
-    line = TRANSACTIONS_MSG + std::to_string(trials.size()) + '\n';
+    line = TRANSACTIONS_MSG + std::to_string(trials.size()) + " ---" + '\n';
     printf("Write_to_temp_file: Writing nº of transactions\n%s", line.c_str());
     n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
     printf("Write_to_temp_file: Currently wrote %ld bytes\n", n);
 
     /* Write trials/guesses */
-    int i = 0;
+    // int i = 0;
     for (auto line: trials) {
         printf("Write_to_temp_file: Writing trial\n%s", line.c_str());
         n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
+        // i++;
         printf("Write_to_temp_file: Currently wrote %ld bytes\n", n);
+        // if (i == trials.size()) {
+        //     break;
+        // }
     }
+    printf("aaaaaaaaa\n");
 
     /* Write WIN/QUIT/ETC (if not an active game) */
     if (game_found == -1) {
@@ -818,11 +832,11 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
         printf("Write_to_temp_file: Writing termination\n%s", line.c_str());
     }
     else {
-        line = CURRENTLY_SOLVED + get_word_knowledge(req) + "\n";
+        // line = CURRENTLY_SOLVED + get_word_knowledge(req) + "\n";
         printf("Write_to_temp_file: Writing current knowledge of word\n", line.c_str());
     }
-    n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
-    printf("Write_to_temp_file: Currently wrote %ld bytes\n", n);
+    // n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
+    // printf("Write_to_temp_file: Currently wrote %ld bytes\n", n);
 
     return n;
 }
