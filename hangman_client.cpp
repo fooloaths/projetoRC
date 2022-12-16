@@ -48,8 +48,7 @@ void status(const char* server_ip, const char* server_port);
 void hint(const char* server_ip, const char* server_port);
 void status_aux_ok(std::string message);
 void hint_aux_ok(std::string message);
-std::stringstream tcp_helper(std::string message, const char* server_ip, const char* server_port, bool is_file = false);
-
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
 int main(int argc, char *argv[]) {
     int fd, errorcode;
     struct addrinfo hints, *res;
@@ -385,7 +384,7 @@ void scoreboard_aux_ok(std::string scoreboard) {
 
 void scoreboard(const char* server_ip, const char* server_port) {
     std::string message = "GSB\n";
-    auto response = tcp_helper(message, server_ip, server_port).str();
+    auto response = tcp_helper(message, server_ip, server_port);
 
     std::string status = get_status(response);
     if (status.compare(OK) == 0) {
@@ -420,8 +419,7 @@ void hint_aux_ok(std::string status) {
 void hint(const char *server_ip, const char *server_port) {
     std::string message = "GHL " + player_id + "\n";
 
-    // !! the server will send the hint in the form of a file
-    auto response = tcp_helper(message, server_ip, server_port, true).str();
+    auto response = tcp_helper(message, server_ip, server_port);
 
     std::string status = get_status(response);
     if (status.compare(OK) == 0) {
@@ -431,7 +429,7 @@ void hint(const char *server_ip, const char *server_port) {
     }
 }
 
-std::stringstream tcp_helper(std::string message, const char* server_ip, const char* server_port, bool is_file) {
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port) {
     int fd, errorcode;
     ssize_t n;
     struct addrinfo hints, *res;
@@ -512,12 +510,12 @@ std::stringstream tcp_helper(std::string message, const char* server_ip, const c
     freeaddrinfo(res);
     close(fd);
 
-    return buffer;
+    return buffer.str();
 }
 
 void status(const char* server_ip, const char* server_port) {
     std::string message = "STA " + player_id + "\n";
-    auto response = tcp_helper(message, server_ip, server_port).str();
+    auto response = tcp_helper(message, server_ip, server_port);
 
     std::string status = get_status(response);
     if (status.compare("ACT") == 0) {
