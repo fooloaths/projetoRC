@@ -405,10 +405,10 @@ void hint_aux_ok(std::string status) {
 
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
-    
-    std::cout << useful_info << std::endl;
-
+    // // useful_info = useful_info.substr(0, useful_info.length() - 1);
     // remove newline from file
+    useful_info.pop_back();
+
     // create a new image file with the name file_name and write useful_info into it
     std::ofstream file(file_name);
     file << useful_info;
@@ -485,33 +485,26 @@ std::stringstream tcp_helper(std::string message, const char* server_ip, const c
     auto response = buffer.str();
     // number of digits is after the third space and the next \n
     ssize_t digits = (ssize_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
-    
+
     // read digits bytes into file_data vector in increments of BLOCK_SIZE
     while (digits > 0) {
         auto to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
-        auto fds = fdopen(fd, "rb");
-        n = fread(file_data, to_read, to_read, fds);
-
-        std::cerr << "to read: " << to_read << std::endl;
-        std::cerr << "n: " << n << std::endl;
+        memset(file_data, 0, BLOCK_SIZE);
+        n = read(fd, file_data, to_read);
 
         if (n == -1) {
             freeaddrinfo(res);
             close(fd);
             exit(1);
         }
-
-        if (!is_file) {
-            if (n < to_read) {
+        if (n < to_read) {
                 to_read = n;
-            }
-            file_data[to_read] = '\0';
-        }
+        } 
 
         digits -= n;
-        buffer << file_data;
+        buffer.write(file_data, to_read);
 
-        if (feof(fds)) {
+        if (n == 0) {
             break;
         }
     }
@@ -576,7 +569,6 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
     
     std::string message = "QUT " + inner_id + '\n';
     send_message(fd, message.c_str(), message.length(), res);
-    // // std::cerr << "sent message: " << message << std::endl;
 
     receive_message(fd, addr, buffer, buf_size);
 
