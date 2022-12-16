@@ -42,7 +42,8 @@
 *.idb
 *.pdb
 *.dump
-TOPSCORES*
+TOPSCORES_*
+STATE_*
 
 # Kernel Module Compile Results
 *.mod*
@@ -52,3 +53,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# our files
+*.png
+*.jpg
