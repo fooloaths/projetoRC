@@ -55,7 +55,6 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
                 struct sockaddr_in addr, socklen_t addrlen, char buffer[]);
 void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
                 struct sockaddr_in addr, socklen_t addrlen, char buffer[]);
-void treat_tcp_request();
 int send_message(int fd, const char* message, size_t buf_size, struct sockaddr_in addr, socklen_t addrlen);
 struct request* process_input(char buffer[]);
 void create_game_session(std::string word, char moves, std::string PLID, std::string hint);
@@ -93,7 +92,8 @@ std::string get_game_trials(struct request *req);
 int file_exists(std::string name);
 size_t create_temporary_state_file(struct request *req, int game_found, const char *fname);
 size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::string word, std::string hint, struct request *req, int active_game, const char *file_name);
-/*int FindTopScores(SCORELIST ∗list)*/
+// // int FindTopScores(SCORELIST ∗list);
+void treat_scoreboard(struct request *req, int fd);
 
 struct request {
     std::string op_code;
@@ -610,7 +610,6 @@ void treat_tcp_request(int fd, struct request *req) {
         //report_error(fd, addr, addrlen, req);
         return;
     }
-
     if (req->op_code == STA) {
         /* Start New Game */
         treat_state(req, fd);
@@ -619,11 +618,26 @@ void treat_tcp_request(int fd, struct request *req) {
         /* Play Letter */
         //treat_play(fd, addr, addrlen, req);
     }
+    else if (req -> op_code == GSB) {
+        /* Scoreboard */
+        treat_scoreboard(req, fd);
+    }
     else {
         /* Invalid protocol message */
         std::string message = ERR + '\n'; // TODO see if other parts of req are invalid (Acho que já está feio ?)
         //send_message(fd, message.c_str(), message.length(), addr, addrlen);
     }
+}
+
+/* Treat scoreboard
+
+    Written by the great and powerful footvaalvica, the mighty and powerful.
+
+    This function is called when the client sends a scoreboard request.
+    It will send the scoreboard to the client.
+*/
+void treat_scoreboard(struct request *req, int fd) {
+    std::cerr << "treat_scoreboard: Starting function" << std::endl;
 }
 
 
