@@ -414,7 +414,7 @@ struct request* process_input(char buffer[]) {
     int i = 0;
     /* Retrieve op code defining the requested functionality from the server */
     printf("process_input: Starting OP CODE loop\n");
-    while (buffer[i] != ' ' && i < BLOCK_SIZE) {
+    while (buffer[i] != ' ' && i < BLOCK_SIZE && buffer[i] != '\n') {
 
         (req->op_code).push_back(buffer[i]);
 
