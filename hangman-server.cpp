@@ -92,8 +92,8 @@ std::string get_game_trials(struct request *req);
 int file_exists(std::string name);
 size_t create_temporary_state_file(struct request *req, int game_found, const char *fname);
 size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::string word, std::string hint, struct request *req, int active_game, const char *file_name);
-// // int FindTopScores(SCORELIST ∗list);
 void treat_scoreboard(struct request *req, int fd);
+// // int FindTopScores(SCORELIST ∗list);
 
 struct request {
     std::string op_code;
@@ -117,7 +117,6 @@ struct game {
 std::unordered_map<std::string, struct game*> active_games;
 std::string word_file = "word_eng.txt";
 FILE* fp_word_file;
-
 
 int main(int argc, char **argv) {
 
@@ -145,30 +144,30 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // int pid = fork();
-    // if (pid != 0) { /* Parent process */
-    //     /* UDP server */
-        //   fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
-        //   if (fd == -1) {
-        //       printf("Error (main): An error occured while attempting to create an UDP socket\n");
-        //       exit(1);
-        //   }
-        //   fp_word_file = fopen(word_file.c_str(), "r");
-        //   if (fp_word_file == NULL) {
-        //       printf("Error (main): Couldn't open word file.\n");
-        //       if (errno == EACCES) {
-        //           printf("    EACCES: Not enough permissions to open file\n");
-        //       }
-        //      /* Close socket and free resources */
-        //       freeaddrinfo(res);
-        //       close(fd);
+    int pid = fork();
+    if (pid != 0) { /* Parent process */
+        /* UDP server */
+          fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
+          if (fd == -1) {
+              printf("Error (main): An error occured while attempting to create an UDP socket\n");
+              exit(1);
+          }
+          fp_word_file = fopen(word_file.c_str(), "r");
+          if (fp_word_file == NULL) {
+              printf("Error (main): Couldn't open word file.\n");
+              if (errno == EACCES) {
+                  printf("    EACCES: Not enough permissions to open file\n");
+              }
+             /* Close socket and free resources */
+              freeaddrinfo(res);
+              close(fd);
 
-        //      return -1;
-        //   }
-        //  srand(SEED); /* Set seed for random num generator */
-        //  udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    //  }
-    // else {
+             return -1;
+          }
+         srand(SEED); /* Set seed for random num generator */
+         udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
+    }
+    else {
         /* TCP server */
         fd = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
         if (fd == -1) {
@@ -176,7 +175,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
         tcp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    // }
+    }
 
 
     return 0;
@@ -355,7 +354,6 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         treat_tcp_request(newfd, req);
         free(req);
 
-
         /* Close connection */
         close(newfd);
 
@@ -429,7 +427,7 @@ struct request* process_input(char buffer[]) {
 
         (req->PLID).push_back(buffer[i]);
         i++;
-
+    
         if (i == BLOCK_SIZE) {
             /* Should have never gotten this big */
             req->error = TRUE;
@@ -445,7 +443,7 @@ struct request* process_input(char buffer[]) {
     }
 
     if (req->op_code == QUT || req->op_code == REV || req->op_code == SNG || req->op_code == GSB ||
-        req->op_code == STA) {
+        req->op_code == STA || req->op_code == GSB) {
         /* Nothing more to parse */
         req->letter_word = "NULL"; req->trial = "NULL";
         return req;
@@ -605,6 +603,9 @@ int treat_request(int fd, struct sockaddr_in addr, socklen_t addrlen, struct req
 void treat_tcp_request(int fd, struct request *req) {
     printf("treat_tcp_request: Starting function\n");
 
+    // print the req->op_code
+    std::cerr << "treat_tcp_request: req->op_code = " << req->op_code << std::endl;
+
     if (req->error == TRUE) {
         /* Something in the given request is invalid */
         //report_error(fd, addr, addrlen, req);
@@ -618,8 +619,9 @@ void treat_tcp_request(int fd, struct request *req) {
         /* Play Letter */
         //treat_play(fd, addr, addrlen, req);
     }
-    else if (req -> op_code == GSB) {
+    else if (req->op_code == GSB) {
         /* Scoreboard */
+        std::cerr << "treat_tcp_request: Calling treat_scoreboard" << std::endl;
         treat_scoreboard(req, fd);
     }
     else {
