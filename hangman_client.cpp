@@ -48,7 +48,7 @@ void status(const char* server_ip, const char* server_port);
 void hint(const char* server_ip, const char* server_port);
 void status_aux_ok(std::string message);
 void hint_aux_ok(std::string message);
-std::stringstream tcp_helper(std::string message, const char* server_ip, const char* server_port, bool is_file = false);
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
@@ -57,7 +57,8 @@ int main(int argc, char *argv[]) {
 
     // check if the number of arguments is correct
     if (argc != 3) {
-        exit(1); // TODO error message
+        std::cout << "Usage: ./hangman_client <server_ip> <server_port>" << std::endl;
+        exit(1);
     }
 
     // get the server's IP address and port number
@@ -84,11 +85,13 @@ int main(int argc, char *argv[]) {
     while (1) {
         std::string input;
         std::getline(std::cin, input);
-
-        // split input in two strings using space as delimiter, doesnt account for malformed input
-        // TODO fix input splitting
-        std::string command = input.substr(0 , input.find(' '));
-        std::string message = input.substr(input.find(' ') + 1, input.length());
+        std::stringstream ss(input);
+        std::string command;
+        std::string message;
+        
+        ss >> command;
+        ss >> message;
+        
         // check if the command is equal to "start"
         if (command == START || command == SG) {
             start_new_game(message, fd, res, addr);
@@ -160,6 +163,7 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
     }
 }   
 
+// TODO CLEAN UP THIS WHOLE FUNCTION
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     player_id = id;
     move_number = 1;
@@ -385,7 +389,7 @@ void scoreboard_aux_ok(std::string scoreboard) {
 
 void scoreboard(const char* server_ip, const char* server_port) {
     std::string message = "GSB\n";
-    auto response = tcp_helper(message, server_ip, server_port).str();
+    auto response = tcp_helper(message, server_ip, server_port);
 
     std::string status = get_status(response);
     if (status.compare(OK) == 0) {
@@ -420,8 +424,7 @@ void hint_aux_ok(std::string status) {
 void hint(const char *server_ip, const char *server_port) {
     std::string message = "GHL " + player_id + "\n";
 
-    // !! the server will send the hint in the form of a file
-    auto response = tcp_helper(message, server_ip, server_port, true).str();
+    auto response = tcp_helper(message, server_ip, server_port);
 
     std::string status = get_status(response);
     if (status.compare(OK) == 0) {
@@ -431,7 +434,7 @@ void hint(const char *server_ip, const char *server_port) {
     }
 }
 
-std::stringstream tcp_helper(std::string message, const char* server_ip, const char* server_port, bool is_file) {
+std::string tcp_helper(std::string message, const char* server_ip, const char* server_port) {
     int fd, errorcode;
     ssize_t n;
     struct addrinfo hints, *res;
@@ -512,12 +515,12 @@ std::stringstream tcp_helper(std::string message, const char* server_ip, const c
     freeaddrinfo(res);
     close(fd);
 
-    return buffer;
+    return buffer.str();
 }
 
 void status(const char* server_ip, const char* server_port) {
     std::string message = "STA " + player_id + "\n";
-    auto response = tcp_helper(message, server_ip, server_port).str();
+    auto response = tcp_helper(message, server_ip, server_port);
 
     std::string status = get_status(response);
     if (status.compare("ACT") == 0) {
