@@ -57,7 +57,8 @@ int main(int argc, char *argv[]) {
 
     // check if the number of arguments is correct
     if (argc != 3) {
-        exit(1); // TODO error message
+        std::cout << "Usage: ./hangman_client <server_ip> <server_port>" << std::endl;
+        exit(1);
     }
 
     // get the server's IP address and port number
@@ -162,6 +163,7 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
     }
 }   
 
+// TODO CLEAN UP THIS WHOLE FUNCTION
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     player_id = id;
     move_number = 1;
