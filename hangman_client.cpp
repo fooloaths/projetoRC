@@ -49,6 +49,7 @@ void hint(const char* server_ip, const char* server_port);
 void status_aux_ok(std::string message);
 void hint_aux_ok(std::string message);
 std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
+
 int main(int argc, char *argv[]) {
     int fd, errorcode;
     struct addrinfo hints, *res;
@@ -83,11 +84,13 @@ int main(int argc, char *argv[]) {
     while (1) {
         std::string input;
         std::getline(std::cin, input);
-
-        // split input in two strings using space as delimiter, doesnt account for malformed input
-        // TODO fix input splitting
-        std::string command = input.substr(0 , input.find(' '));
-        std::string message = input.substr(input.find(' ') + 1, input.length());
+        std::stringstream ss(input);
+        std::string command;
+        std::string message;
+        
+        ss >> command;
+        ss >> message;
+        
         // check if the command is equal to "start"
         if (command == START || command == SG) {
             start_new_game(message, fd, res, addr);
