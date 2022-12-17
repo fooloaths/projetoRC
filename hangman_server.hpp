@@ -36,6 +36,7 @@
 #define MOVE "mv "
 #define ACTIVE_GAME_PATH "GAMES/GAME_"
 #define SCORES "SCORES/"
+#define PICTURES "PICTURES/"
 #define STATE "STATE_"
 #define TXT ".txt"
 #define LAST_GAME_MSG "Last finalized game for player "
