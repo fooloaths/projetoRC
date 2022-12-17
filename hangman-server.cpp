@@ -145,6 +145,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    // clone while sharing cout and cerr
     int pid = fork();
     if (pid != 0) { /* Parent process */
         /* UDP server */
@@ -421,7 +422,10 @@ struct request* process_input(char buffer[]) {
         i++;
 
         if (i == BLOCK_SIZE) {
-            /* Should have never gotten this big */
+            /* Should have never gotten this big
+
+                pelo menos alguma coisa é big UwU
+            */
             req->error = TRUE;
             return req;
         }
@@ -454,7 +458,7 @@ struct request* process_input(char buffer[]) {
     if (req->op_code == QUT || req->op_code == REV || req->op_code == SNG || req->op_code == GSB ||
         req->op_code == STA || req->op_code == GHL) {
         /* Nothing more to parse */
-        printf("\nprocess_input: No need to continue\n");
+        printf("process_input: No need to continue\n");
         req->letter_word = "NULL"; req->trial = "NULL";
         return req;
     }
@@ -614,10 +618,10 @@ int treat_request(int fd, struct sockaddr_in addr, socklen_t addrlen, struct req
     Checks the op_code associated with the request and calls the sub-routine
     that implements that functionality */
 void treat_tcp_request(int fd, struct request *req) {
-    printf("treat_tcp_request: Starting function\n");
+    std::cout << "treat_tcp_request: Starting function\n";
 
     // print the req->op_code
-    std::cerr << "treat_tcp_request: req->op_code = " << req->op_code << std::endl;
+    std::cerr << "treat_tcp_request: req->op_code = " << req->op_code << "yo mista white" << std::endl;
 
     if (req->error == TRUE) {
         /* Something in the given request is invalid */
@@ -626,15 +630,16 @@ void treat_tcp_request(int fd, struct request *req) {
     }
     if (req->op_code == STA) {
         /* Send game state */
+        printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
         treat_state(req, fd);
     }
     else if (req->op_code == GHL) {
         /* Send hint */
-        treat_hint(req, fd);
+        treat_hint(req, fd);    
     }
-    else if (req->op_code == GSB) {
+    if (req->op_code == GSB) {
         /* Scoreboard */
-        std::cerr << "treat_tcp_request: Calling treat_scoreboard" << std::endl;
+        std::cout << "treat_tcp_request: GSB request received\n";
         treat_scoreboard(req, fd);
     }
     else {
