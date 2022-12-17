@@ -72,6 +72,7 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
 void treat_quit(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req);
 void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req);
 void treat_state(struct request *req, int fd);
+void treat_hint(struct request *req, int fd);
 std::string positions(char letter, std::string word);
 void record_move_for_active_game(struct request *req);
 int compare_plays(struct request *req, std::string line);
@@ -235,6 +236,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
                 struct sockaddr_in addr, socklen_t addrlen, char buffer[]) {
     int newfd;
     char byte[1];
+    memset(byte, '\0', sizeof byte);
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; //IPv4
@@ -297,6 +299,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         exit(1);
     }
 
+    std::string input_message;
     while (1) {
         addrlen = sizeof(addr);
 
@@ -309,7 +312,8 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         /* Read from Socket */
         //n = read(newfd, buffer, BLOCK_SIZE);
 
-        std::string input_message;
+        // std::string input_message;
+        // memset(&input_message, 0, sizeof(input_message));
         while (byte[0] != '\n') {
             // read BLOCK_SIZE blocks until \n
             n = read(newfd, byte, 1);
@@ -342,10 +346,8 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
             }
             input_message.push_back(byte[0]);
         }
-        printf("Message is %s", input_message.c_str());
-
+        printf("tcp_server: The message is %s", input_message.c_str());
         struct request *req = process_input(&(input_message.front()));
-        printf("tcp_server: Processed input!\n");
         if (req == NULL) {
             printf("Error (udp_server): Couldn't allocate memory to process request\n");
         }
@@ -357,8 +359,10 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         /* Close connection */
         close(newfd);
 
-        /* Reset buffer */
+        /* Reset buffers */
         memset(buffer, '\0', BLOCK_SIZE);
+        input_message.clear();
+        memset(byte, '\0', sizeof byte);
     }
 
     freeaddrinfo(res);
@@ -388,7 +392,9 @@ int send_message(int fd, const char* message, size_t buf_size, struct sockaddr_i
     Parses information stored in buffer onto a struct request and returns
     a pointer to that struct */
 struct request* process_input(char buffer[]) {
+    printf("\nprocess_input: Starting function\n");
 
+    printf("process_input: Allocating memory for request structure\n");
     struct request *req = (struct request *) malloc(sizeof(struct request));
     
     /* Check if memory for the request was correctly allocated */
@@ -398,6 +404,7 @@ struct request* process_input(char buffer[]) {
     }
 
     /* Initialize struct */
+    printf("process_input: Initializing struct req memory\n");
     req->error = FALSE;
     memset(&(req->op_code), 0, sizeof(req->op_code));
     memset(&(req->letter_word), 0, sizeof(req->letter_word));
@@ -406,6 +413,7 @@ struct request* process_input(char buffer[]) {
 
     int i = 0;
     /* Retrieve op code defining the requested functionality from the server */
+    printf("process_input: Starting OP CODE loop\n");
     while (buffer[i] != ' ' && i < BLOCK_SIZE) {
 
         (req->op_code).push_back(buffer[i]);
@@ -421,7 +429,7 @@ struct request* process_input(char buffer[]) {
     i++;
 
     /* Retrieve the player ID */
-
+    printf("process_input: Starting PLID loop\n");
     while ((buffer[i] != ' ' && buffer[i] != '\0' && buffer[i] != '\n')  && i < BLOCK_SIZE) {
         //printf("\ni = %d , buffer[i] = %c\n", i, buffer[i]);
 
@@ -442,9 +450,11 @@ struct request* process_input(char buffer[]) {
                     // TODO maybe use req->error instead of valid_plid in other parts of code
     }
 
+    printf("process_input: Checking op code to see if we should continue\n");
     if (req->op_code == QUT || req->op_code == REV || req->op_code == SNG || req->op_code == GSB ||
-        req->op_code == STA || req->op_code == GSB) {
+        req->op_code == STA || req->op_code == GHL) {
         /* Nothing more to parse */
+        printf("\nprocess_input: No need to continue\n");
         req->letter_word = "NULL"; req->trial = "NULL";
         return req;
     }
@@ -551,7 +561,10 @@ std::string get_random_line_from_file() {
         line_num++;
         memset(buffer, '\0', WORD_LINE_SIZE);
     }
-    return buffer;
+
+    std::string output = buffer;
+    free(buffer);
+    return output;
 }
 
 
@@ -612,12 +625,12 @@ void treat_tcp_request(int fd, struct request *req) {
         return;
     }
     if (req->op_code == STA) {
-        /* Start New Game */
+        /* Send game state */
         treat_state(req, fd);
     }
-    else if (req->op_code == PLG) {
-        /* Play Letter */
-        //treat_play(fd, addr, addrlen, req);
+    else if (req->op_code == GHL) {
+        /* Send hint */
+        treat_hint(req, fd);
     }
     else if (req->op_code == GSB) {
         /* Scoreboard */
@@ -644,30 +657,30 @@ void treat_scoreboard(struct request *req, int fd) {
 
 
 void treat_state(struct request *req, int fd) {
-    printf("treat_state: Starting function\n");
+    // printf("treat_state: Starting function\n");
 
     int i = 0;
     std::string status;
     std::string message = RST;
-    printf("treat_state: Message is currently: %s\n", message.c_str());
+    // printf("treat_state: Message is currently: %s\n", message.c_str());
     int found = check_for_active_game(req);
     char game_path[FINISHEd_GAME_PATH_SIZE]; // TODO check this constant
-    printf("treat_state: Memsetting the game_path variable\n");
+    // printf("treat_state: Memsetting the game_path variable\n");
     memset(game_path, '\0', FINISHEd_GAME_PATH_SIZE);
     if (found == -1) {
         /* No active game */
-        printf("treat_state: No active game found\n");
+        // printf("treat_state: No active game found\n");
         status = FIN;
 
         found = FindLastGame(&(req->PLID).front(), game_path);
         if (found == 0) {
             /* No finished games found either */
-            printf("treat_state: No games found\n");
+            // printf("treat_state: No games found\n");
             status = NOK;
 
             /* Reply to client */
             message = message + " " + status + "\n";
-            printf("treat_state: Sending message: %s", message.c_str());
+            // printf("treat_state: Sending message: %s", message.c_str());
             ssize_t n = write(fd, message.c_str(), message.length());
             if (n == -1) {
                 /*freeaddrinfo(res);
@@ -677,7 +690,7 @@ void treat_state(struct request *req, int fd) {
         }
     }
     else {
-        printf("treat_state: A game was found!!!\n");
+        // printf("treat_state: A game was found!!!\n");
         std::string path = ACTIVE_GAME_PATH + req->PLID + TXT;
         sprintf(game_path, "%s", path.c_str());
         status = ACT;
@@ -688,11 +701,11 @@ void treat_state(struct request *req, int fd) {
 
     /* Send temp file to client */
     std::string file_name = STATE + req->PLID + TXT;
-    printf("treat_start: Opening file %s for reading\n", file_name.c_str());
+    // printf("treat_start: Opening file %s for reading\n", file_name.c_str());
 
 
     message = message + " " + status + " " + file_name + " " + std::to_string(file_size) + "     ";
-    printf("treat_start: Message is currently %s\n", message.c_str());
+    // printf("treat_start: Message is currently %s\n", message.c_str());
 
     std::string content;
     std::ifstream file;
@@ -704,7 +717,7 @@ void treat_state(struct request *req, int fd) {
     }
     file.close();
 
-    printf("treat_start: Message being sent is\n%s", message.c_str());
+    // printf("treat_start: Message being sent is\n%s", message.c_str());
 
     /* Send reply */
     ssize_t n = write(fd, message.c_str(), message.length());
@@ -750,7 +763,8 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
 
     /* Exctract word and hint from game file */ // TODO esta parte ainda só funciona se for um active game file
     printf("\ncreate_temporary_state_file: Gettind word and hint\n");
-    std::string word_and_hint = get_word_and_hint(fname);
+    // std::string word_and_hint = get_word_and_hint(fname);
+    char *word_and_hint = get_word_and_hint(fname);
     std::string word = get_word(word_and_hint);
     printf("\ncreate_temporary_state_file: The word is %s\n", word.c_str());
     std::string hint = get_hint(word_and_hint);
@@ -790,6 +804,7 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
 
     fclose(game_file);
     fclose(state_file);
+    free(word_and_hint);
 
     // TODO se for um jogo ativo, ir buscar word knowledge
 
@@ -956,6 +971,10 @@ std::string get_first_line_from_game_file(struct request *req) { // TODO check i
 
     /* Get first line from file */
     getline(&buffer, &buf_size, fp);
+    
+    // std::string output = buffer;
+    // free(buffer);
+    // free(fname);
 
     return buffer; // TODO dar free algures
 }
@@ -1799,4 +1818,79 @@ int file_exists(std::string name) {
     else {
         return -1;
     }   
+}
+
+/* Treat Hint:
+    
+    If there is no active game for req->PLID or there is something wrong with
+    the request, replies RHL NOK
+    
+    Otherwise, sends the contents of the hint file, with the the reply message
+    formatted as 
+    RHL status [Fname Fsize Fdata]*/
+void treat_hint(struct request *req, int fd) {
+    std::string message = RHL;
+    message.push_back(' ');
+    // printf("treat_hint: Starting function. The message is currently\n%s\n", message.c_str());
+
+    /* Look for active games with req->PLID */
+    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
+        /* Send NOK message */
+        
+        message = message + NOK + "\n";
+        // printf("treat_hint: Sending message: %s", message.c_str());
+        ssize_t n = write(fd, message.c_str(), message.length());
+        if (n == -1) {
+            exit(1);
+        }
+        return;
+    }
+    message = message + OK + " ";
+    // printf("treat_hint: Game found. The message is currently\n%s\n", message.c_str());
+
+    /* Get name of hint file */
+    std::string game_path = ACTIVE_GAME_PATH + req->PLID + TXT;
+    // std::string line = get_word_and_hint(game_path);
+    char *line = get_word_and_hint(game_path);
+    std::string hint = get_hint(line);
+    // printf("treat_hint: The hint is\n%s\n", hint.c_str());
+
+    message = message + hint + " ";
+    // printf("treat_hint: The message is now\n%s\n", message.c_str());
+
+    /* Open hint file */
+    std::string hint_path = PICTURES + hint;
+    // printf("treat_hint: Opening file (read binary) with path\n%s\n", hint_path.c_str());
+    FILE *file = fopen(hint_path.c_str(), "rb");
+
+    /* Get file size */
+    fseek(file, 0, SEEK_END); // Place offset at the end of file
+    ssize_t size = ftell(file); // Get offset value
+    fseek(file, 0, SEEK_SET); // Set offset back to the start of file
+    // printf("treat_hint: File size is %ld bytes\n", size);
+
+    message = message + std::to_string(size) + " ";
+    // printf("treat_hint: The message is now\n%s\n", message.c_str());
+    fclose(file);
+    
+    /* Read file content */
+    std::ifstream hint_file(hint_path);
+    std::string content;
+
+
+    while (getline (hint_file, content)) {
+        content.push_back('\n');
+        message = message + content;
+    }
+    hint_file.close();
+
+
+    message = message + "\n";
+    // printf("treat_hint: Message being sent is\n%s", message.c_str());
+    /* Send reply */
+    ssize_t n = write(fd, message.c_str(), message.length());
+    if (n == -1) {
+        exit(1);
+    }
+    free(line);
 }
