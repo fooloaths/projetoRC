@@ -430,6 +430,11 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
+    if (req->op_code == GSB) {
+        /* Nothing more to parse */
+        req->letter_word = "NULL"; req->trial = "NULL"; req->PLID = "NULL";
+        return req;
+    }
     i++;
 
     /* Retrieve the player ID */
@@ -621,7 +626,7 @@ void treat_tcp_request(int fd, struct request *req) {
     std::cout << "treat_tcp_request: Starting function\n";
 
     // print the req->op_code
-    std::cerr << "treat_tcp_request: req->op_code = " << req->op_code << "yo mista white" << std::endl;
+    std::cerr << "treat_tcp_request: req->op_code = " << req->op_code << "yo mista white\n" << std::endl;
 
     if (req->error == TRUE) {
         /* Something in the given request is invalid */
