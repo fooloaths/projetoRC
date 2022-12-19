@@ -88,10 +88,13 @@ int FindLastGame(char *PLID, char *fname);
 std::string get_word_knowledge(struct request *req);
 void increment_game_error(struct request *req);
 void increment_game_trials(struct request *req);
+void increment_game_success(struct request *req);
 void decrement_game_trials(struct request *req);
 std::string get_game_errors(struct request *req);
 std::string get_game_trials(struct request *req);
 int file_exists(std::string name);
+void create_directories();
+std::string compute_score(struct request *req);
 size_t create_temporary_state_file(struct request *req, int game_found, const char *fname);
 size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::string word, std::string hint, struct request *req, int active_game, const char *file_name);
 /*int FindTopScores(SCORELIST ∗list)*/
@@ -112,6 +115,7 @@ struct game {
     std::string hint_file;  // TODO meter o hint file aqui durante o treat request
     std::string word_knowledge;
     int errors;
+    int n_succs;
 };
 
 
@@ -139,6 +143,7 @@ int main(int argc, char **argv) {
 
     word_file = argv[1];
 
+    create_directories();
 
     memset(&act, 0,sizeof(act));
     act.sa_handler = SIG_IGN;
@@ -1050,6 +1055,7 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
 
     if (word == req->letter_word) { // Won the game
         /* Prepare reply for client */
+        increment_game_success(req);
         message = message + WIN + moves;
         move_to_SCORES(req, W);
     }
@@ -1429,7 +1435,7 @@ void move_to_SCORES(struct request *req, char code) {
     system(shell_command.c_str());
 
     /* Move game file to SCORES/ */
-    file_name = SCORES + g->move_number + "_" + req->PLID + "_" + get_current_date_and_time(SCORES) + ".txt";
+    file_name = SCORES + compute_score(req) + "_" + req->PLID + "_" + get_current_date_and_time(SCORES) + ".txt";
     shell_command = MOVE + current_path + " " + file_name;
     system(shell_command.c_str());
 
@@ -1562,6 +1568,7 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     if (!(positions((req->letter_word).front(), word).empty())) { // Some positions were found
         /* Prepare reply for client and update game file */
         update_game(req);
+        increment_game_success(req);
         if (won_game(req)) {
             /* Won the game */
             message = message + WIN + "\n";
@@ -1877,4 +1884,39 @@ void treat_hint(struct request *req, int fd) {
         exit(1);
     }
     free(line);
+}
+
+/* Increment game success 
+
+    Increment the attribute n_succs for the struct game indexed by req->PLID */
+void increment_game_success(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    /* Update move number */
+    g->n_succs++;
+}
+
+
+std::string compute_score(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    /* Update move number */
+    int score = g->n_succs / std::stoi(g->move_number);
+
+    return std::to_string(score);
+}
+
+void create_directories() {
+    std::string games = GAMES_DIR;
+    if (is_directory(GAMES_DIR) == -1) {
+        mkdir(GAMES_DIR, 0777);
+    }
+    if (is_directory(SCORES) == -1) {
+        mkdir(SCORES, 0777);
+    }
+    if (is_directory(PICTURES) == -1) {
+        mkdir(PICTURES, 0777);
+    }
 }
