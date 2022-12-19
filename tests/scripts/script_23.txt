@@ -1,0 +1,9 @@
+start 100001
+quit
+start 100002
+guess a
+guess abcdefghi
+guess abcdefghijklmnopqrstuvwxyz
+guess barracuda
+scoreboard
+exit

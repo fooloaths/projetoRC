@@ -1,0 +1,89 @@
+start 100001
+quit
+start 100002
+guess abc
+guess abcdef
+guess abcdefgh
+guess abcdefghi
+guess abcdefghij
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess barracuda
+scoreboard
+start 100003
+guess abcd
+guess abcdef
+guess abcdefgh
+guess abcdefghi
+guess abcdefghij
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess chlorobenzylidenemalononitrile
+scoreboard
+start 100004
+guess abcdef
+guess abcdefgh
+guess abcdefghi
+guess abcdefghij
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess decarbonization
+scoreboard
+start 100005
+guess abcdef
+guess abcdefgh
+guess abcdefghi
+guess abcdefghij
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess electroencephalographical
+scoreboard
+start 100006
+guess abcdefgh
+guess abcdefghi
+guess abcdefghij
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess ferromagnetism
+scoreboard
+start 100007
+guess abcdefghi
+guess abcdefghij
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess goggomobil
+scoreboard
+start 100008
+guess abcdefghij
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess helicoidal
+scoreboard
+start 100009
+guess abcdefghijk
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess island
+scoreboard
+start 100010
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess joker
+scoreboard
+start 100011
+guess abcdefghijkl
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess knowledge
+scoreboard
+start 100012
+guess abcdefghijklmnopqrstuvwxyzabcd
+guess lighthouse
+scoreboard
+exit

@@ -1,0 +1,13 @@
+start 100001
+play a
+play b
+play c
+play d
+play e
+play f
+play g
+play h
+play i
+play r
+scoreboard
+exit

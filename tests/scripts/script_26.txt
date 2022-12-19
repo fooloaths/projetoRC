@@ -1,0 +1,105 @@
+start 100001
+hint
+RCOMP witch.jpg
+quit
+start 100002
+hint
+RCOMP esox_sphyraena.jpg
+quit
+start 100003
+hint
+RCOMP 2D-struct.png
+quit
+start 100004
+hint
+RCOMP PV_Panel.jpg
+quit
+start 100005
+hint
+RCOMP EEG.png
+quit
+start 100006
+hint
+RCOMP magnet.jpg
+quit
+start 100007
+hint
+RCOMP g_car.jpeg
+quit
+start 100008
+hint
+RCOMP Helix.svg
+quit
+start 100009
+hint
+RCOMP maldives.jpg
+quit
+start 100010
+hint
+RCOMP card.jpg
+quit
+start 100011
+hint
+RCOMP Great-horned-owl.jpg
+quit
+start 100012
+hint
+RCOMP Roca.jpg
+quit
+start 100013
+hint
+RCOMP mmmm.jpeg
+quit
+start 100014
+hint
+RCOMP nu.png
+quit
+start 100015
+hint
+RCOMP watching.jpg
+quit
+start 100016
+hint
+RCOMP monotremata.jpg
+quit
+start 100017
+hint
+RCOMP surround.png
+quit
+start 100018
+hint
+RCOMP x-ray.jpg
+quit
+start 100019
+hint
+RCOMP northwest_ad.jpg
+quit
+start 100020
+hint
+RCOMP totem_pole.jpg
+quit
+start 100021
+hint
+RCOMP connector.jpg
+quit
+start 100022
+hint
+RCOMP SP_vac.jpg
+quit
+start 100023
+hint
+RCOMP cup.jpeg
+quit
+start 100024
+hint
+RCOMP swordtail.jpg
+quit
+start 100025
+hint
+RCOMP falls.jpg
+quit
+start 100026
+hint
+RCOMP faravahar.jpg
+quit
+exit

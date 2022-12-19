@@ -1,0 +1,237 @@
+start 100001
+play a
+play b
+play c
+play y
+play z
+state
+guess abracadabra
+state
+start 100002
+play a
+play b
+play c
+play y
+play z
+state
+guess barracuda
+state
+start 100003
+play a
+play b
+play x
+play y
+play w
+state
+guess chlorobenzylidenemalononitrile
+state
+start 100004
+play a
+play b
+play x
+play y
+play z
+state
+guess decarbonization
+state
+start 100005
+play a
+play e
+play g
+play y
+play z
+state
+guess electroencephalographical
+state
+start 100006
+play a
+play f
+play g
+play y
+play z
+state
+guess ferromagnetism
+state
+start 100007
+play g
+play o
+play m
+play y
+play z
+state
+guess goggomobil
+state
+start 100008
+play a
+play b
+play h
+play l
+play z
+state
+guess helicoidal
+state
+start 100009
+play a
+play x
+play i
+play s
+play z
+state
+guess island
+state
+start 100010
+play a
+play b
+play k
+play j
+play o
+state
+guess joker
+state
+start 100011
+play k
+play b
+play n
+play z
+play g
+state
+guess knowledge
+state
+start 100012
+play e
+play b
+play l
+play y
+play h
+state
+guess lighthouse
+state
+start 100013
+play a
+play b
+play m
+play p
+play z
+state
+guess manipulator
+state
+start 100014
+play n
+play d
+play y
+play f
+play g
+state
+guess nanotechnology
+state
+start 100015
+play o
+play b
+play s
+play y
+play z
+state
+guess observation
+state
+start 100016
+play p
+play l
+play a
+play f
+play z
+state
+guess platypus
+state
+start 100017
+play c
+play d
+play q
+play y
+play z
+state
+guess quadraphonic
+state
+start 100018
+play g
+play d
+play r
+play y
+play z
+state
+guess roentgenography
+state
+start 100019
+play t
+play d
+play r
+play y
+play u
+state
+guess stratocruiser
+state
+start 100020
+play b
+play d
+play x
+play y
+play h
+state
+guess thunderbird
+state
+start 100021
+play u
+play s
+play x
+play y
+play z
+state
+guess usb
+state
+start 100022
+play c
+play d
+play v
+play z
+play i
+state
+guess vaccine
+state
+start 100023
+play n
+play d
+play i
+play y
+play z
+state
+guess winning
+state
+start 100024
+guess xiphophorus
+start 100025
+play c
+play s
+play x
+play y
+play w
+state
+guess yellowstone
+state
+start 100026
+play c
+play z
+play x
+play o
+play r
+state
+guess zoroastrianism
+state
+start 100027
+play c
+play d
+play x
+play r
+play z
+state
+guess abracadabra
+state
+exit

@@ -180,7 +180,6 @@ int main(int argc, char **argv) {
         tcp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
     }
 
-
     return 0;
 }
 
