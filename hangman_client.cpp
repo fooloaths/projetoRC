@@ -67,15 +67,24 @@ int main(int argc, char *argv[]) {
 
     // create a socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd == -1) exit(1);
+    if (fd == -1) {
+        std::cout << "Error: " << strerror(errno) << std::endl;
+        exit(1);
+    }
+    
 
     // set the server's address
-    if (memset(&hints, 0, sizeof(hints)) == NULL) exit(1);
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
+    if (memset(&hints, 0, sizeof(hints)) == NULL) {
+        std::cout << "Error: " << strerror(errno) << std::endl;
+        exit(1);
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+    }
+    
 
     errorcode = getaddrinfo(server_ip, server_port, &hints, &res);
     if (errorcode != 0) {
+        std::cout << "Error: " << gai_strerror(errorcode) << std::endl;
         exit(1); 
         freeaddrinfo(res);
         close(fd);
@@ -89,11 +98,27 @@ int main(int argc, char *argv[]) {
 
         ss >> command;
         ss >> message;
-        
-        // check if the command is equal to "start"
+
+        // poll for timeout (must review) 
+        struct timeval tv;
+        tv.tv_sec = 5;
+        tv.tv_usec = 0;
+        if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
+            std::cout << "Error, possibly a timeout: " << strerror(errno) << std::endl;
+            exit(1);
+        }
+
         if (command == START || command == SG) {
+            if (message.empty()) {
+                std::cout << "Input Error: Invalid command.\n";
+                continue;
+            }
             start_new_game(message, fd, res, addr);
         } else if (command == PLAY || command == PL) {
+            if (message.empty()) {
+                std::cout << "Input Error: Invalid command.\n";
+                continue;
+            }
             play(message, fd, res, addr);
         } else if (command == "quit") {
             exit_game(message, fd, res, addr);
@@ -101,6 +126,10 @@ int main(int argc, char *argv[]) {
             exit_game(message, fd, res, addr);
             break;
         } else if (command == GUESS || command == GW) {
+            if (message.empty()) {
+                std::cout << "Input Error: Invalid command.\n";
+                continue;
+            }
             guess(message, fd, res, addr);
         } else if (command == SCOREBOARD || command == SB) {
             scoreboard(server_ip, server_port);
@@ -135,12 +164,18 @@ std::string format_word(std::string word_to_format) {
 std::string receive_message(int fd, struct sockaddr_in addr, size_t buf_size) {
     socklen_t addrlen = sizeof(addr);
     char buffer[buf_size] = {0};
-    if (recvfrom(fd, buffer, buf_size, 0, (struct sockaddr*)&addr, &addrlen) == -1) exit(1);
+    if (recvfrom(fd, buffer, buf_size, 0, (struct sockaddr*)&addr, &addrlen) == -1) {
+        std::cout << "Error: " << strerror(errno) << std::endl;
+        exit(1);
+    }
     return buffer;
 }
 
 void send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res) {
-    if (sendto(fd, message, buf_size, 0, res->ai_addr, res->ai_addrlen) == -1) exit(1);
+    if (sendto(fd, message, buf_size, 0, res->ai_addr, res->ai_addrlen) == -1) {
+        std::cout << "Error: " << strerror(errno) << std::endl;
+        exit(1);
+    }
 }
 
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
@@ -152,6 +187,7 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
 
     std::string status = get_status(response);
     if (status == "OK") {
+        // ?! IS THIS CORRECT
         exit(1);
     } else if (status == "ERR") {
         std::cout << "There is no ongoing game.\n";	
