@@ -172,10 +172,8 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     word = "";
     
     send_message(fd, message.c_str(), message.length(), res);
-    // // std::cerr << "start_new_game: Buffer before receiving message: " << buffer << std::endl;
 
     receive_message(fd, addr, buffer, BLOCK_SIZE);  
-    // // std::cerr << "start_new_game: Buffer after receiving message: " << buffer << std::endl;
     std::string response = buffer;
 
     // remove \n from response
@@ -197,8 +195,6 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     std::string n_letters = response.substr(response.find(' ', response.find(' ') + 1) + 1, response.find(' ', response.find(' ', response.find(' ') + 1) + 1));
     std::string max_errors = response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length());
     
-    // // std::cerr << "start_new_game: status: " << status << std::endl;
-
     // convert number of letters into a number of underscores to print
     int n_letters_int = std::stoi(n_letters);
     for (int i = 0; i < n_letters_int; i++) {
@@ -224,6 +220,7 @@ std::string get_status(std::string message) {
         status.push_back(message[i]);
         i++;
     }
+
 
     return status;
 }
@@ -392,6 +389,7 @@ void scoreboard(const char* server_ip, const char* server_port) {
     auto response = tcp_helper(message, server_ip, server_port);
 
     std::string status = get_status(response);
+
     if (status.compare(OK) == 0) {
         scoreboard_aux_ok(response);
     } else {
@@ -441,6 +439,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     std::stringstream buffer;
     char byte[1];
     char file_data[BLOCK_SIZE];
+    int digits = 0;
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -487,7 +486,15 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 
     auto response = buffer.str();
     // number of digits is after the third space and the next \n
-    ssize_t digits = (ssize_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
+    
+    try {
+        digits = (ssize_t) stoi(response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length()));
+    } catch (std::invalid_argument& e) {
+        freeaddrinfo(res);
+        close(fd);
+        return buffer.str();
+    }
+
 
     // read digits bytes into file_data vector in increments of BLOCK_SIZE
     while (digits > 0) {
