@@ -378,7 +378,7 @@ void scoreboard_aux_ok(std::string scoreboard) {
     // file_size is between the first space and the first space
     auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
     // remove newline from file
-    useful_info = useful_info.substr(useful_info.find('-'), useful_info.length()); 
+    useful_info = useful_info.substr(useful_info.find(' ') + 1, useful_info.length()); 
     std::cout << useful_info;
     
     // create new file named file_name with file_size bytes and write useful_info into it

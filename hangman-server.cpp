@@ -147,30 +147,30 @@ int main(int argc, char **argv) {
     }
 
     // clone while sharing cout and cerr
-    // // int pid = fork();
-    // // if (pid != 0) { /* Parent process */
-    // //     /* UDP server */
-    // //       fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
-    // //       if (fd == -1) {
-    // //           printf("Error (main): An error occured while attempting to create an UDP socket\n");
-    // //           exit(1);
-    // //       }
-    // //       fp_word_file = fopen(word_file.c_str(), "r");
-    // //       if (fp_word_file == NULL) {
-    // //           printf("Error (main): Couldn't open word file.\n");
-    // //           if (errno == EACCES) {
-    // //               printf("    EACCES: Not enough permissions to open file\n");
-    // //           }
-    // //          /* Close socket and free resources */
-    // //           freeaddrinfo(res);
-    // //           close(fd);
+    int pid = fork();
+    if (pid != 0) { /* Parent process */
+        /* UDP server */
+          fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
+          if (fd == -1) {
+              printf("Error (main): An error occured while attempting to create an UDP socket\n");
+              exit(1);
+          }
+          fp_word_file = fopen(word_file.c_str(), "r");
+          if (fp_word_file == NULL) {
+              printf("Error (main): Couldn't open word file.\n");
+              if (errno == EACCES) {
+                  printf("    EACCES: Not enough permissions to open file\n");
+              }
+             /* Close socket and free resources */
+              freeaddrinfo(res);
+              close(fd);
 
-    // //          return -1;
-    // //       }
-    // //      srand(SEED); /* Set seed for random num generator */
-    // //      udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    // // }
-    // // else {
+             return -1;
+          }
+         srand(SEED); /* Set seed for random num generator */
+         udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
+    }
+    else {
         /* TCP server */
         fd = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
         if (fd == -1) {
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
         tcp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    // // }
+    }
 
 
     return 0;
@@ -645,7 +645,7 @@ void treat_tcp_request(int fd, struct request *req) {
     }
     if (req->op_code == GSB) {
         /* Scoreboard */
-        std::cout << "treat_tcp_request: GSB request received\n";
+        // // std::cout << "treat_tcp_request: GSB request received\n";
         treat_scoreboard(req, fd);
     }
     else {
@@ -660,29 +660,54 @@ std::string create_scoreboard() {
 
     std::cerr << "create_scoreboard: Starting function\n";
 
-    std::vector<std::string> file_names;
+    std::string scoreboard = "TOP 10 SCORES:\n";
     DIR *dir;
     struct dirent *ent;
+
+    // keep a vector of the ten highest scores
+    std::vector<int> top_scores;
 
     if ((dir = opendir ("SCORES")) != NULL) {
         while ((ent = readdir (dir)) != NULL) {
             if (ent->d_name[0] != '.') {
-                file_names.push_back(ent->d_name);
+                std::string file_name = ent->d_name;
+                auto score_sep = file_name.find('_');
+
+                auto score = stoi(file_name.substr(0, score_sep));
+                // if the score is higher than the lowest score in the top_scores vector and there are less than 10 scores, add it to the vector
+                if (top_scores.size() < 10) {
+                    top_scores.push_back(score);
+                    std::sort(top_scores.begin(), top_scores.end());
+                }
+                else if (score > top_scores[0] && top_scores.size() == 10) {
+                    top_scores[0] = score;
+                    std::sort(top_scores.begin(), top_scores.end());
+                } else {
+                    continue;
+                }
+
+                
+                scoreboard.append(file_name.substr(0, score_sep));
+                scoreboard.push_back('\t');
+                // find the string from score_sep to the next underscore
+                auto pl_id = file_name.substr(score_sep + 1, file_name.find('_', score_sep + 1) - score_sep - 1);
+                scoreboard.append(pl_id);
+                scoreboard.push_back('\n');
             }
         }
         closedir (dir);
     } else {
         /* could not open directory */
         perror ("");
-        return;
+        return "";
     }
 
-    // print the contents of the vector
-    for (int i = 0; i < file_names.size(); i++) {
-        std::cout << file_names[i] << std::endl;
+    if (scoreboard == "TOP 10 SCORES:\n") {
+        return "EMPTY";
     }
 
-    return "";
+    std::cout << "create_scoreboard: scoreboard = " << scoreboard << std::endl;
+    return scoreboard;
     
 }
 
@@ -694,30 +719,31 @@ std::string create_scoreboard() {
     It will send the scoreboard to the client.
 */
 void treat_scoreboard(struct request *req, int fd) {
-    std::cerr << "treat_scoreboard: ASUDUASUD" << std::endl;
-    std::cerr << "treat_scoreboard: req->op_code = " << req->op_code << std::endl;
     auto message = create_scoreboard();
+    //get current unix time in seconds
+    auto time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string file_name = "SCOREBOARD_" + std::to_string(time) + ".txt ";
+    std::string file_length = std::to_string(message.size() + 1) + " ";
 
-    // // std::string message = "RSB";
-    // // std::string line;
-    // // std::ifstream scoreboard_file("scoreboard.txt");
-    // // if (scoreboard_file.is_open()) {
-    // //     while (getline(scoreboard_file, line)) {
-    // //         message += line + '\n';
-    // //     }
-    // //     scoreboard_file.close();
-    // // }
-    // // else {
-    // //     std::cerr << "treat_scoreboard: Error opening scoreboard file" << std::endl;
-    // //     message = ERR + '\n';
-    // // }
-    // // message += RST;
-    // // auto n = write(fd, message.c_str(), message.length());
-    // // if (n < 0) {
-    // //     std::cerr << "treat_scoreboard: Error writing to socket" << std::endl;
-    // // }
+    if (message == "") {
+        message = ERR + '\n';
+    }
+    else if (message == "EMPTY") {
+        message = "RSB EMPTY\n";
+    }
+    else {
+        message = "RSB OK " + file_name + file_length + message + '\n';
+    }
 
+    std::cout << "treat_scoreboard: message = " << message << std::endl;
 
+    ssize_t n = write(fd, message.c_str(), message.length());
+    if (n == -1) {
+        
+        /*freeaddrinfo(res);
+        close(fd);*/
+        exit(1);
+    }
 
     return;
 }
