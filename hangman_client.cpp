@@ -34,7 +34,7 @@ std::string player_id;
 std::string word;
 
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
-void receive_message(int fd, sockaddr_in addr, char* buffer, size_t buf_size);
+std::string receive_message(int fd, sockaddr_in addr, size_t buf_size);
 void send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 std::string get_status(std::string message);
@@ -83,12 +83,10 @@ int main(int argc, char *argv[]) {
 
     /* main program code */
     while (1) {
-        std::string input;
+        std::string input, command, message;
         std::getline(std::cin, input);
         std::stringstream ss(input);
-        std::string command;
-        std::string message;
-        
+
         ss >> command;
         ss >> message;
         
@@ -134,9 +132,11 @@ std::string format_word(std::string word_to_format) {
     return formatted_word;
 }
 
-void receive_message(int fd, struct sockaddr_in addr, char* buffer, size_t buf_size) {
+std::string receive_message(int fd, struct sockaddr_in addr, size_t buf_size) {
     socklen_t addrlen = sizeof(addr);
+    char buffer[buf_size] = {0};
     if (recvfrom(fd, buffer, buf_size, 0, (struct sockaddr*)&addr, &addrlen) == -1) exit(1);
+    return buffer;
 }
 
 void send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res) {
@@ -144,11 +144,9 @@ void send_message(int fd, const char* message, size_t buf_size, struct addrinfo 
 }
 
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE] = {0};
     std::string message = REV + player_id + "\n";
     send_message(fd, message.c_str(), message.length(), res);
-    receive_message(fd, addr, buffer, BLOCK_SIZE);
-    std::string response = buffer;
+    auto response = receive_message(fd, addr, BLOCK_SIZE);
     // remove all characters after \n
     response = response.substr(0, response.find('\n') + 1);
 
@@ -168,13 +166,11 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     player_id = id;
     move_number = 1;
     std::string message = SNG + id + "\n";
-    char buffer[BLOCK_SIZE] = {0};
     word = "";
     
     send_message(fd, message.c_str(), message.length(), res);
 
-    receive_message(fd, addr, buffer, BLOCK_SIZE);  
-    std::string response = buffer;
+    auto response = receive_message(fd, addr, BLOCK_SIZE);  
 
     // remove \n from response
     response.pop_back();
@@ -290,7 +286,6 @@ std::string play_aux_ok(std::string word_pos, std::string letter) {
 }
 
 int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     std::string response = "";
 
@@ -298,9 +293,8 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
         // Send message
         std::string message = PWG + player_id + ' ' + guess_word + ' ' +  std::to_string(move_number) + '\n';
         send_message(fd, message.c_str(), message.length(), res);
-        receive_message(fd, addr, buffer, buf_size);
+        response = receive_message(fd, addr, buf_size);
 
-        response = buffer;
         // remove all characters after \n
         response = response.substr(0, response.find('\n') + 1);
     }
@@ -324,7 +318,6 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
 }
 
 int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     std::string response = "";
 
@@ -336,9 +329,8 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
     while (response == "") {
         std::string message = PLG + player_id + ' ' + letter + ' ' + std::to_string(move_number) + '\n';
         send_message(fd, message.c_str(), message.length(), res);
-        receive_message(fd, addr, buffer, buf_size);
-        
-        response = buffer;
+        response = receive_message(fd, addr, buf_size);
+
         // remove all characters after the first \n
         response = response.substr(0, response.find('\n') + 1);
     }
@@ -562,7 +554,6 @@ void status_aux_ok(std::string status) {
 }
 
 int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    char buffer[BLOCK_SIZE] = {0};
     size_t buf_size = BLOCK_SIZE;
     auto inner_id = id;
     if (player_id.empty() && id.empty()) {
@@ -580,9 +571,8 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
     std::string message = "QUT " + inner_id + '\n';
     send_message(fd, message.c_str(), message.length(), res);
 
-    receive_message(fd, addr, buffer, buf_size);
+    auto response = receive_message(fd, addr, buf_size);
 
-    std::string response = buffer;
     // remove all characters after the first \n
     response = response.substr(0, response.find('\n') + 1);
 
