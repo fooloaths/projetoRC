@@ -94,6 +94,7 @@ int file_exists(std::string name);
 size_t create_temporary_state_file(struct request *req, int game_found, const char *fname);
 size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::string word, std::string hint, struct request *req, int active_game, const char *file_name);
 void treat_scoreboard(struct request *req, int fd);
+std::string create_scoreboard_file();
 // // int FindTopScores(SCORELIST ∗list);
 
 struct request {
@@ -146,30 +147,30 @@ int main(int argc, char **argv) {
     }
 
     // clone while sharing cout and cerr
-    int pid = fork();
-    if (pid != 0) { /* Parent process */
-        /* UDP server */
-          fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
-          if (fd == -1) {
-              printf("Error (main): An error occured while attempting to create an UDP socket\n");
-              exit(1);
-          }
-          fp_word_file = fopen(word_file.c_str(), "r");
-          if (fp_word_file == NULL) {
-              printf("Error (main): Couldn't open word file.\n");
-              if (errno == EACCES) {
-                  printf("    EACCES: Not enough permissions to open file\n");
-              }
-             /* Close socket and free resources */
-              freeaddrinfo(res);
-              close(fd);
+    // // int pid = fork();
+    // // if (pid != 0) { /* Parent process */
+    // //     /* UDP server */
+    // //       fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
+    // //       if (fd == -1) {
+    // //           printf("Error (main): An error occured while attempting to create an UDP socket\n");
+    // //           exit(1);
+    // //       }
+    // //       fp_word_file = fopen(word_file.c_str(), "r");
+    // //       if (fp_word_file == NULL) {
+    // //           printf("Error (main): Couldn't open word file.\n");
+    // //           if (errno == EACCES) {
+    // //               printf("    EACCES: Not enough permissions to open file\n");
+    // //           }
+    // //          /* Close socket and free resources */
+    // //           freeaddrinfo(res);
+    // //           close(fd);
 
-             return -1;
-          }
-         srand(SEED); /* Set seed for random num generator */
-         udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    }
-    else {
+    // //          return -1;
+    // //       }
+    // //      srand(SEED); /* Set seed for random num generator */
+    // //      udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
+    // // }
+    // // else {
         /* TCP server */
         fd = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
         if (fd == -1) {
@@ -177,7 +178,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
         tcp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    }
+    // // }
 
 
     return 0;
@@ -654,6 +655,37 @@ void treat_tcp_request(int fd, struct request *req) {
     }
 }
 
+std::string create_scoreboard() {
+    // iterate through all the files in the SCORES folder, and store the file_name in a vector
+
+    std::cerr << "create_scoreboard: Starting function\n";
+
+    std::vector<std::string> file_names;
+    DIR *dir;
+    struct dirent *ent;
+
+    if ((dir = opendir ("SCORES")) != NULL) {
+        while ((ent = readdir (dir)) != NULL) {
+            if (ent->d_name[0] != '.') {
+                file_names.push_back(ent->d_name);
+            }
+        }
+        closedir (dir);
+    } else {
+        /* could not open directory */
+        perror ("");
+        return;
+    }
+
+    // print the contents of the vector
+    for (int i = 0; i < file_names.size(); i++) {
+        std::cout << file_names[i] << std::endl;
+    }
+
+    return "";
+    
+}
+
 /* Treat scoreboard
 
     Written by the great and powerful footvaalvica, the mighty and powerful.
@@ -662,7 +694,32 @@ void treat_tcp_request(int fd, struct request *req) {
     It will send the scoreboard to the client.
 */
 void treat_scoreboard(struct request *req, int fd) {
-    std::cerr << "treat_scoreboard: Starting function" << std::endl;
+    std::cerr << "treat_scoreboard: ASUDUASUD" << std::endl;
+    std::cerr << "treat_scoreboard: req->op_code = " << req->op_code << std::endl;
+    auto message = create_scoreboard();
+
+    // // std::string message = "RSB";
+    // // std::string line;
+    // // std::ifstream scoreboard_file("scoreboard.txt");
+    // // if (scoreboard_file.is_open()) {
+    // //     while (getline(scoreboard_file, line)) {
+    // //         message += line + '\n';
+    // //     }
+    // //     scoreboard_file.close();
+    // // }
+    // // else {
+    // //     std::cerr << "treat_scoreboard: Error opening scoreboard file" << std::endl;
+    // //     message = ERR + '\n';
+    // // }
+    // // message += RST;
+    // // auto n = write(fd, message.c_str(), message.length());
+    // // if (n < 0) {
+    // //     std::cerr << "treat_scoreboard: Error writing to socket" << std::endl;
+    // // }
+
+
+
+    return;
 }
 
 
@@ -670,7 +727,7 @@ void treat_state(struct request *req, int fd) {
     // printf("treat_state: Starting function\n");
 
     int i = 0;
-    std::string status;
+    std::string status; 
     std::string message = RST;
     // printf("treat_state: Message is currently: %s\n", message.c_str());
     int found = check_for_active_game(req);
