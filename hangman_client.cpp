@@ -36,13 +36,13 @@ std::string word;
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 std::string receive_message(int fd, sockaddr_in addr, size_t buf_size);
 void send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
-int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
+void exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 std::string get_status(std::string message);
 std::string play_aux_ok(std::string message, std::string letter);
-int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in add);
+void play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in add);
 std::string format_word(std::string word_to_format = word);
 void scoreboard(const char* server_ip, const char* server_port);
-int guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in addr);
+void guess(std::string word, int fd, struct addrinfo *res, struct sockaddr_in addr);
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr);
 void status(const char* server_ip, const char* server_port);
 void hint(const char* server_ip, const char* server_port);
@@ -68,14 +68,14 @@ int main(int argc, char *argv[]) {
     // create a socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
-        std::cout << "Error: " << strerror(errno) << std::endl;
+        std::cout << "Error socket: " << strerror(errno) << std::endl;
         exit(1);
     }
     
 
     // set the server's address
     if (memset(&hints, 0, sizeof(hints)) == NULL) {
-        std::cout << "Error: " << strerror(errno) << std::endl;
+        std::cout << "Error memset: " << strerror(errno) << std::endl;
         exit(1);
         hints.ai_family = AF_INET;
         hints.ai_socktype = SOCK_DGRAM;
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 
     errorcode = getaddrinfo(server_ip, server_port, &hints, &res);
     if (errorcode != 0) {
-        std::cout << "Error: " << gai_strerror(errorcode) << std::endl;
+        std::cout << "Error getaddrinfo: " << gai_strerror(errorcode) << std::endl;
         exit(1); 
         freeaddrinfo(res);
         close(fd);
@@ -99,12 +99,12 @@ int main(int argc, char *argv[]) {
         ss >> command;
         ss >> message;
 
-        // poll for timeout (must review) 
+        // poll for timeout UDP (must review) 
         struct timeval tv;
         tv.tv_sec = 5;
         tv.tv_usec = 0;
         if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
-            std::cout << "Error, possibly a timeout: " << strerror(errno) << std::endl;
+            std::cout << "Error " << strerror(errno) << std::endl;
             exit(1);
         }
 
@@ -165,15 +165,17 @@ std::string receive_message(int fd, struct sockaddr_in addr, size_t buf_size) {
     socklen_t addrlen = sizeof(addr);
     char buffer[buf_size] = {0};
     if (recvfrom(fd, buffer, buf_size, 0, (struct sockaddr*)&addr, &addrlen) == -1) {
-        std::cout << "Error: " << strerror(errno) << std::endl;
-        exit(1);
+        return "";
     }
+
+    std::cerr << "Received: " << buffer;
+
     return buffer;
 }
 
 void send_message(int fd, const char* message, size_t buf_size, struct addrinfo *res) {
     if (sendto(fd, message, buf_size, 0, res->ai_addr, res->ai_addrlen) == -1) {
-        std::cout << "Error: " << strerror(errno) << std::endl;
+        std::cout << "Error send_message : " << strerror(errno) << std::endl;
         exit(1);
     }
 }
@@ -181,7 +183,15 @@ void send_message(int fd, const char* message, size_t buf_size, struct addrinfo 
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
     std::string message = REV + player_id + "\n";
     send_message(fd, message.c_str(), message.length(), res);
-    auto response = receive_message(fd, addr, BLOCK_SIZE);
+    std::string response;
+
+    try {
+        response = receive_message(fd, addr, BLOCK_SIZE);
+    } catch (std::exception& e) {
+        std::cout << "Error: Timeout.\n";
+        return;
+    }
+
     // remove all characters after \n
     response = response.substr(0, response.find('\n') + 1);
 
@@ -199,14 +209,17 @@ void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
 
 // TODO CLEAN UP THIS WHOLE FUNCTION
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    player_id = id;
-    move_number = 1;
     std::string message = SNG + id + "\n";
-    word = "";
+    std::string response;
     
     send_message(fd, message.c_str(), message.length(), res);
 
-    auto response = receive_message(fd, addr, BLOCK_SIZE);  
+    try {
+        response = receive_message(fd, addr, BLOCK_SIZE);
+    } catch (std::exception& e) {
+        std::cout << "Error: Timeout.\n";
+        return;
+    } 
 
     // remove \n from response
     response.pop_back();
@@ -223,6 +236,10 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
         std::cout << "YOU CAN'T DO THAT!! THERE'S A GAME GOING ON!\n";
         return;
     }
+
+    player_id = id;
+    move_number = 1;
+    word = "";
 
     std::string n_letters = response.substr(response.find(' ', response.find(' ') + 1) + 1, response.find(' ', response.find(' ', response.find(' ') + 1) + 1));
     std::string max_errors = response.substr(response.find(' ', response.find(' ', response.find(' ') + 1) + 1) + 1, response.length());
@@ -293,6 +310,8 @@ std::string play_aux_ok(std::string word_pos, std::string letter) {
     word_pos.pop_back();
     word_pos = word_pos.substr(word_pos.find(' ', word_pos.find(' ', word_pos.find(' ') + 1) + 1) + 1, word_pos.length());
 
+    std::cerr << "word_pos: " << word_pos << "\n";
+
     // split word_pos into two strings by the first space
     // TODO fix input splitting
     std::string positions = word_pos.substr(word_pos.find(' ') + 1, word_pos.length());
@@ -321,17 +340,21 @@ std::string play_aux_ok(std::string word_pos, std::string letter) {
     
 }
 
-int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    size_t buf_size = BLOCK_SIZE;
-    std::string response = "";
+void guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_in addr) {
+    std::string response;
 
     while (response == "") {
         // Send message
         std::string message = PWG + player_id + ' ' + guess_word + ' ' +  std::to_string(move_number) + '\n';
         send_message(fd, message.c_str(), message.length(), res);
-        response = receive_message(fd, addr, buf_size);
+        try {
+            response = receive_message(fd, addr, BLOCK_SIZE);
+        } catch (std::exception& e) {
+            std::cout << "Error: Timeout.\n";
+            return;
+        }
 
-        // remove all characters after \n
+        // remove all characters _after \n
         response = response.substr(0, response.find('\n') + 1);
     }
 
@@ -350,25 +373,31 @@ int guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_
         printf("ERROR!!!\n");
         move_number--;
     }
-    return 0;
+    return;
 }
 
-int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    size_t buf_size = BLOCK_SIZE;
+void play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     std::string response = "";
 
     if (letter.length() != 1 || !isalpha(letter[0])) {
         printf("Error (play): The letter must be a single character.\n");
-        return -1;
+        return;
     }
     
     while (response == "") {
         std::string message = PLG + player_id + ' ' + letter + ' ' + std::to_string(move_number) + '\n';
         send_message(fd, message.c_str(), message.length(), res);
-        response = receive_message(fd, addr, buf_size);
+        try {
+            response = receive_message(fd, addr, BLOCK_SIZE);
+        } catch (std::exception& e) {
+            std::cout << "Error: Timeout.\n";
+            return;
+        }
 
         // remove all characters after the first \n
-        response = response.substr(0, response.find('\n') + 1);
+        response.pop_back();
+
+        std::cout << "response: " << response << "\n";
     }
 
     std::string status = get_status(response);
@@ -392,7 +421,7 @@ int play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in ad
         printf("ERROR!!!\n");
         move_number--;
     }
-    return 0;
+    return;
 }
 
 void scoreboard_aux_ok(std::string scoreboard) {
@@ -414,7 +443,14 @@ void scoreboard_aux_ok(std::string scoreboard) {
 
 void scoreboard(const char* server_ip, const char* server_port) {
     std::string message = "GSB\n";
-    auto response = tcp_helper(message, server_ip, server_port);
+    std::string response = "";
+    
+    try {
+        response = tcp_helper(message, server_ip, server_port);
+    } catch (std::exception& e) {
+        std::cout << "Error: Timeout.\n";
+        return;
+    }
 
     std::string status = get_status(response);
 
@@ -449,8 +485,14 @@ void hint_aux_ok(std::string status) {
 
 void hint(const char *server_ip, const char *server_port) {
     std::string message = "GHL " + player_id + "\n";
-
-    auto response = tcp_helper(message, server_ip, server_port);
+    std::string response = "";
+    
+    try {
+        response = tcp_helper(message, server_ip, server_port);
+    } catch (std::exception& e) {
+        std::cout << "Error: Timeout.\n";
+        return;
+    }
 
     std::string status = get_status(response);
     if (status.compare(OK) == 0) {
@@ -486,6 +528,14 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
         exit(1);
     }
 
+    struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
+        std::cout << "Error " << strerror(errno) << std::endl;
+        exit(1);
+    }
+
     n = connect(fd, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
         freeaddrinfo(res);
@@ -507,7 +557,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
         if (n == -1) {
             freeaddrinfo(res);
             close(fd);
-            exit(1);
+            return "";
         }
         buffer << byte[0];
     }
@@ -555,7 +605,14 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 
 void status(const char* server_ip, const char* server_port) {
     std::string message = "STA " + player_id + "\n";
-    auto response = tcp_helper(message, server_ip, server_port);
+    std::string response = "";
+    
+    try {
+        response = tcp_helper(message, server_ip, server_port);
+    } catch (std::exception& e) {
+        std::cout << "Error: Timeout.\n";
+        return;
+    }
 
     std::string status = get_status(response);
     if (status.compare("ACT") == 0) {
@@ -589,12 +646,11 @@ void status_aux_ok(std::string status) {
     file.close();
 }
 
-int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
-    size_t buf_size = BLOCK_SIZE;
+void exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     auto inner_id = id;
     if (player_id.empty() && id.empty()) {
         std::cout << "You haven't started a game yet!!!\n";
-        return 1;
+        return;
     }
 
     if (id.empty()) {
@@ -610,8 +666,14 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
     
     std::string message = "QUT " + inner_id + '\n';
     send_message(fd, message.c_str(), message.length(), res);
-
-    auto response = receive_message(fd, addr, buf_size);
+    std::string response;
+    
+    try {
+        response = receive_message(fd, addr, BLOCK_SIZE);
+    } catch (std::exception& e) {
+        std::cout << "Error: Timeout.\n";
+        return;
+    }
 
     // remove all characters after the first \n
     response = response.substr(0, response.find('\n') + 1);
@@ -623,5 +685,5 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
         printf("Player doesn't have an ongoing game or the connection wasn't properly closed.\n");
     }
 
-    return 0;
+    return;
 }
