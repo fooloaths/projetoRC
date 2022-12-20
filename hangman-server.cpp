@@ -49,6 +49,7 @@ Mateus Pinho - ist199282
 #define SEED 73
 #define NUMBER_OF_WORDS 6       // TODO algumas destas constantes foram tiradas do rabo
 #define WORD_LINE_SIZE 25
+#define ARG_PORT "-p"
 
 
 void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
@@ -118,6 +119,7 @@ struct game {
 
 std::unordered_map<std::string, struct game*> active_games;
 std::string word_file = "word_eng.txt";
+std::string port = PORT;
 FILE* fp_word_file;
 
 int main(int argc, char **argv) {
@@ -135,6 +137,13 @@ int main(int argc, char **argv) {
         printf("Input Error (main): Expected, at least, 1 argument (word_file), but none was given.\n");
         printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
         return 1;
+    }
+    if (argc > 2) {
+        std::string arg_1 = argv[2];
+        std::string arg_2 = argv[3];
+        if (arg_1 == ARG_PORT) {
+            port = arg_2;
+        }
     }
 
     word_file = argv[1];
@@ -192,7 +201,7 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     hints.ai_flags = AI_PASSIVE;
 
     printf("olá\n");
-    errorcode = getaddrinfo(NULL, PORT, &hints, &res);
+    errorcode = getaddrinfo(NULL, port.c_str(), &hints, &res);
     if (errorcode != 0) {
         printf("Error (udp_server): An error occured while getting an addrinfo structure\n");
         exit(1);
@@ -244,7 +253,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     hints.ai_socktype = SOCK_STREAM; //TCP socket
     hints.ai_flags = AI_PASSIVE;
 
-    errorcode = getaddrinfo(NULL, PORT, &hints, &res);
+    errorcode = getaddrinfo(NULL, port.c_str(), &hints, &res);
     if (errorcode != 0) {
         printf("Error (tcp_server): An error occured while getting an addrinfo structure\n");
         exit(1);
@@ -640,17 +649,19 @@ void treat_tcp_request(int fd, struct request *req) {
     }
     else if (req->op_code == GHL) {
         /* Send hint */
+        printf("Chegou ao hint!!!!!!!!!!!!!!!!!!!!\n");
         treat_hint(req, fd);    
     }
-    if (req->op_code == GSB) {
+    else if (req->op_code == GSB) {
         /* Scoreboard */
         // // std::cout << "treat_tcp_request: GSB request received\n";
         treat_scoreboard(req, fd);
     }
     else {
         /* Invalid protocol message */
+        printf("TCP vai mandar ERR?!?!?!\n");
         std::string message = ERR + '\n'; // TODO see if other parts of req are invalid (Acho que já está feio ?)
-        //send_message(fd, message.c_str(), message.length(), addr, addrlen);
+        // send_message(fd, message.c_str(), message.length(), addr, addrlen);
     }
 }
 
@@ -1625,7 +1636,7 @@ std::string get_current_date_and_time(std::string directory) {
       - If play was unsuccessful with some attempts remaining:
         Update game file */
 void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req) {
-    std::string message = RWG;
+    std::string message = RLG;
     message.push_back(' ');
 
     /* Look for active games with req->PLID */
@@ -1639,6 +1650,7 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     /* Compare number of moves to req->trials */
     std::string move_number = get_game_trials(req);
     std::string moves = " " + move_number + "\n";
+    printf("O req->trial = %s e o move_number = %s\n", (req->trial).c_str(), move_number.c_str());
     if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
         message = message + INV + moves;
