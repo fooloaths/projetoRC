@@ -395,7 +395,7 @@ void play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in a
         }
 
         // remove all characters after the first \n
-        response.pop_back();
+        response = response.substr(0, response.find('\n') + 1);
 
         std::cout << "response: " << response << "\n";
     }
