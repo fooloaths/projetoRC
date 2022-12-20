@@ -99,6 +99,7 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
 size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::string word, std::string hint, struct request *req, int active_game, const char *file_name);
 void treat_scoreboard(struct request *req, int fd);
 std::string create_scoreboard_file();
+void tcp_write(int fd, std::string message);
 // // int FindTopScores(SCORELIST ∗list);
 
 struct request {
@@ -249,7 +250,7 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
 
 void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
                 struct sockaddr_in addr, socklen_t addrlen, char buffer[]) {
-    int newfd, ret;
+    int newfd, ret = 0;
     pid_t pid;
     char byte[1];
     memset(byte, '\0', sizeof byte);
@@ -360,7 +361,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         }
         /* Close connection */
         do {
-            close(newfd);
+            ret = close(newfd);
         } while (ret == -1 && errno == EINTR);
         if (ret == -1) {
             printf("Error (tcp_server): Coudln't close file descriptor\n");
@@ -745,13 +746,14 @@ void treat_scoreboard(struct request *req, int fd) {
 
     std::cout << "treat_scoreboard: message = " << message << std::endl;
 
-    ssize_t n = write(fd, message.c_str(), message.length());
-    if (n == -1) {
+    tcp_write(fd, message);
+    // ssize_t n = write(fd, message.c_str(), message.length());
+    // if (n == -1) {
         
-        /*freeaddrinfo(res);
-        close(fd);*/
-        exit(1);
-    }
+    //     /*freeaddrinfo(res);
+    //     close(fd);*/
+    //     exit(1);
+    // }
 
     return;
 }
@@ -782,12 +784,13 @@ void treat_state(struct request *req, int fd) {
             /* Reply to client */
             message = message + " " + status + "\n";
             // printf("treat_state: Sending message: %s", message.c_str());
-            ssize_t n = write(fd, message.c_str(), message.length());
-            if (n == -1) {
-                /*freeaddrinfo(res);
-                close(fd);*/
-                exit(1);
-            }
+            tcp_write(fd, message);
+            // ssize_t n = write(fd, message.c_str(), message.length());
+            // if (n == -1) {
+            //     /*freeaddrinfo(res);
+            //     close(fd);*/
+            //     exit(1);
+            // }
         }
     }
     else {
@@ -821,13 +824,14 @@ void treat_state(struct request *req, int fd) {
     // printf("treat_start: Message being sent is\n%s", message.c_str());
 
     /* Send reply */
-    ssize_t n = write(fd, message.c_str(), message.length());
-    if (n == -1) {
+    tcp_write(fd, message);
+    // ssize_t n = write(fd, message.c_str(), message.length());
+    // if (n == -1) {
         
-        /*freeaddrinfo(res);
-        close(fd);*/
-        exit(1);
-    }
+    //     /*freeaddrinfo(res);
+    //     close(fd);*/
+    //     exit(1);
+    // }
 
     /* Delete temp file */
     std::string delete_command = "rm ";
@@ -1943,10 +1947,11 @@ void treat_hint(struct request *req, int fd) {
         
         message = message + NOK + "\n";
         // printf("treat_hint: Sending message: %s", message.c_str());
-        ssize_t n = write(fd, message.c_str(), message.length());
-        if (n == -1) {
-            exit(1);
-        }
+        tcp_write(fd, message);
+        // ssize_t n = write(fd, message.c_str(), message.length());
+        // if (n == -1) {
+        //     exit(1);
+        // }
         return;
     }
     message = message + OK + " ";
@@ -1992,10 +1997,11 @@ void treat_hint(struct request *req, int fd) {
     message = message + "\n";
     // printf("treat_hint: Message being sent is\n%s", message.c_str());
     /* Send reply */
-    ssize_t n = write(fd, message.c_str(), message.length());
-    if (n == -1) {
-        exit(1);
-    }
+    tcp_write(fd, message);
+    // ssize_t n = write(fd, message.c_str(), message.length());
+    // if (n == -1) {
+    //     exit(1);
+    // }
     free(line);
 }
 
@@ -2031,5 +2037,23 @@ void create_directories() {
     }
     if (is_directory(PICTURES) == -1) {
         mkdir(PICTURES, 0777);
+    }
+}
+
+void tcp_write(int fd, std::string message) {
+    ssize_t bytes = message.length();
+    ssize_t n;
+    const char *ptr = message.c_str();
+
+    printf("tcp_write: We want to send message = %s", ptr);
+    while (bytes > 0) {
+        printf("\nyo\n");
+        n = write(fd, ptr, message.length());
+        if (n <= 0) {
+            printf("Error (tcp_write): Something went wrong writing to the file descriptor\n");
+            exit(1);
+        }
+        bytes = bytes - n;
+        ptr = ptr + n;
     }
 }
