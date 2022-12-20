@@ -47,7 +47,7 @@ Mateus Pinho - ist199282
 #define PORT "58011"
 #define GAME_NAME 15
 #define SEED 73
-#define NUMBER_OF_WORDS 6       // TODO algumas destas constantes foram tiradas do rabo
+#define NUMBER_OF_WORDS 26       // TODO algumas destas constantes foram tiradas do rabo
 #define WORD_LINE_SIZE 25
 #define ARG_PORT "-p"
 
@@ -125,6 +125,7 @@ struct game {
 std::unordered_map<std::string, struct game*> active_games;
 std::string word_file = "word_eng.txt";
 std::string port = PORT;
+int file_line = 0;
 FILE* fp_word_file;
 
 int main(int argc, char **argv) {
@@ -560,7 +561,8 @@ int valid_PLID(std::string PLID) {
     
     NUMBER_OF_WORDS is the number of lines on the word file */
 std::string get_random_line_from_file() {
-    int line = rand() % NUMBER_OF_WORDS;
+    // int line = rand() % NUMBER_OF_WORDS;
+    file_line = file_line % NUMBER_OF_WORDS;
 
     int line_num = 0;
     char *buffer = (char *) malloc(WORD_LINE_SIZE * sizeof(char));
