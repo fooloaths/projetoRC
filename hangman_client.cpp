@@ -16,7 +16,6 @@ Mateus Pinho - ist199282
 #include <stdlib.h>
 #include <ctype.h>
 #include <string>
-#include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -231,8 +230,8 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     // TODO fix input splitting    
     std::string response_command = response.substr(0 , response.find(' '));
     if (response_command == ERR) {
-        std::cout << "el servidor no esta muy bueno ya?\n";
-        exit(1);
+        std::cout << "The command is wrong.\n";
+        return;
     }
     
     // TODO fix input splitting
@@ -263,6 +262,11 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
  
 std::string get_status(std::string message) {
     size_t i = 4; // Skip reply signature (RLG) and space
+
+    if (message.length() < 4) {
+        printf("Error: Invalid message. You have commited a Gonçalo Nunes error.\n");
+        exit(1);
+    }
 
     std::string status;
     // take off \n if it exists
@@ -372,6 +376,8 @@ void guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr
     if (status.compare(WIN) == 0) {
         printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", 
         guess_word.c_str());
+    } else if (status == "DUP") {
+        printf("YOU ALREADY TRIED THIS WORD!!!\n");
     } else if (status.compare(NOK) == 0) {
         printf("YOU ARE WRONG!!!\n");
     } else if (status.compare(OVR) == 0) {
@@ -494,7 +500,12 @@ void hint_aux_ok(std::string status) {
     file << useful_info;
     file.close();
 
-    std::cout << "The hint is in the file " << file_name << std::endl;
+    // store the file_size of file_name into length
+    std::ifstream file2(file_name, std::ios::binary | std::ios::ate);
+    auto file_size = file2.tellg();
+    file2.close();
+
+    std::cout << "The hint is in the file " << file_name << "and it is " << file_size << " bytes\n";
 }
 
 void hint(const char *server_ip, const char *server_port) {
@@ -528,7 +539,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     std::stringstream buffer;
     char byte[1];
     char file_data[BLOCK_SIZE];
-    int digits = 0;
+    ssize_t digits = 0;
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -595,7 +606,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 
     // read digits bytes into file_data vector in increments of BLOCK_SIZE
     while (digits > 0) {
-        auto to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
+        size_t to_read = (size_t) (digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits);
         memset(file_data, 0, BLOCK_SIZE);
         n = read(fd, file_data, to_read);
 
@@ -604,12 +615,13 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
             close(fd);
             return NULL;
         }
-        if (n < to_read) {
-                to_read = n;
+
+        if ((size_t) n < to_read) {
+                to_read = (size_t) n;
         } 
 
         digits -= n;
-        buffer.write(file_data, to_read);
+        buffer.write(file_data, (ssize_t) to_read);
 
         if (n == 0) {
             break;
@@ -650,6 +662,8 @@ void status(const char* server_ip, const char* server_port) {
 }
 
 void status_aux_ok(std::string status) {
+    // TODO remove specific number of spaces handler
+
     // split the string into two strings after the first tab
 
     // file_name is between the second space and the third space
@@ -663,8 +677,9 @@ void status_aux_ok(std::string status) {
     while (status.find("     ") != std::string::npos) {
         status.erase(status.find("     "), 5);
     }
-    std::cout << status;
 
+    std::cout << "Status was saved to " << file_name << "with " << length << " bytes.\n";
+    std::cout << status;
     std::ofstream file(file_name);
     file << status;
     file.close();
@@ -703,10 +718,12 @@ void exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in 
     response = response.substr(0, response.find('\n') + 1);
 
     std::string status = get_status(response);
-    if (status.compare(OK) == 0) {
+    if (status == "OK") {
         printf("GOODBYE :3\n");
+    } else if (status == "NOK") {
+        printf("Player doesn't have an ongoing game.\n");
     } else {
-        printf("Player doesn't have an ongoing game or the connection wasn't properly closed.\n");
+        printf("The connection wasn't properly closed.\n");
     }
 
     return;
