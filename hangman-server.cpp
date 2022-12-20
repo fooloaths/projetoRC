@@ -1188,7 +1188,7 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     }
     else {
         increment_game_error(req);
-        if (get_game_errors(req) == max_tries(word)) { // No more errors
+        if (std::stoi(get_game_errors(req)) > std::stoi(max_tries(word))) { // No more errors
                 /* Prepare reply for client */
                 message = message + OVR + moves;
                 move_to_SCORES(req, F);
@@ -1713,7 +1713,7 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     else { /* Wrong guess */
         increment_game_error(req);
         increment_game_trials(req);
-        if (get_game_errors(req) == max_tries(word)) { // No more errors
+        if (std::stoi(get_game_errors(req)) > std::stoi(max_tries(word))) { // No more errors
             /* Prepare reply for client */
             message = message + OVR + moves + "\n";
             move_to_SCORES(req, F);
