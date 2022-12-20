@@ -16,7 +16,6 @@ Mateus Pinho - ist199282
 #include <stdlib.h>
 #include <ctype.h>
 #include <string>
-#include <stdlib.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
