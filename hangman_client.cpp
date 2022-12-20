@@ -29,9 +29,9 @@ Mateus Pinho - ist199282
 #include <fstream>
 
 /* Global variables */
-int move_number;
-std::string player_id;
-std::string word;
+int move_number = 0;
+std::string player_id = "";
+std::string word = "";
 
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 std::string receive_message(int fd, sockaddr_in addr, size_t buf_size);
@@ -165,7 +165,7 @@ std::string receive_message(int fd, struct sockaddr_in addr, size_t buf_size) {
     socklen_t addrlen = sizeof(addr);
     char buffer[buf_size] = {0};
     if (recvfrom(fd, buffer, buf_size, 0, (struct sockaddr*)&addr, &addrlen) == -1) {
-        return "";
+        return NULL;
     }
 
     std::cerr << "Received: " << buffer;
@@ -181,6 +181,11 @@ void send_message(int fd, const char* message, size_t buf_size, struct addrinfo 
 }
 
 void reveal_word(int fd, struct addrinfo *res, struct sockaddr_in addr) {
+    if (player_id.empty()) {
+        std::cout << "Error: You are not playing a game.\n";
+        return;
+    }
+
     std::string message = REV + player_id + "\n";
     send_message(fd, message.c_str(), message.length(), res);
     std::string response;
@@ -342,6 +347,10 @@ std::string play_aux_ok(std::string word_pos, std::string letter) {
 
 void guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     std::string response;
+    if (player_id.empty()) {
+        std::cout << "Error: You are not playing a game.\n";
+        return;
+    }
 
     while (response == "") {
         // Send message
@@ -378,6 +387,11 @@ void guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr
 
 void play(std::string letter, int fd, struct addrinfo *res, struct sockaddr_in addr) {
     std::string response = "";
+
+    if (player_id.empty()) {
+        std::cout << "Error: You are not playing a game.\n";
+        return;
+    }
 
     if (letter.length() != 1 || !isalpha(letter[0])) {
         printf("Error (play): The letter must be a single character.\n");
@@ -484,6 +498,11 @@ void hint_aux_ok(std::string status) {
 }
 
 void hint(const char *server_ip, const char *server_port) {
+    if (player_id.empty()) {
+        std::cout << "Error: You are not playing a game.\n";
+        return;
+    }
+
     std::string message = "GHL " + player_id + "\n";
     std::string response = "";
     
@@ -540,7 +559,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     if (n == -1) {
         freeaddrinfo(res);
         close(fd);
-        exit(1);
+        return NULL;
     }
 
     // TODO byte by byte writes
@@ -548,7 +567,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     if (n == -1) {
         freeaddrinfo(res);
         close(fd);
-        exit(1);
+        return NULL;
     }
 
     // read BLOCK_SIZE blocks until \n
@@ -557,7 +576,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
         if (n == -1) {
             freeaddrinfo(res);
             close(fd);
-            return "";
+            return NULL;
         }
         buffer << byte[0];
     }
@@ -583,7 +602,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
         if (n == -1) {
             freeaddrinfo(res);
             close(fd);
-            exit(1);
+            return NULL;
         }
         if (n < to_read) {
                 to_read = n;
@@ -604,6 +623,11 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 }
 
 void status(const char* server_ip, const char* server_port) {
+    if (player_id.empty()) {
+        std::cout << "Error: You are not playing a game.\n";
+        return;
+    }
+
     std::string message = "STA " + player_id + "\n";
     std::string response = "";
     
