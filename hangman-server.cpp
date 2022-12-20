@@ -708,11 +708,36 @@ std::string create_scoreboard() {
 
                 
                 scoreboard.append(file_name.substr(0, score_sep));
-                scoreboard.push_back('\t');
+                scoreboard.push_back(' ');
                 // find the string from score_sep to the next underscore
                 auto pl_id = file_name.substr(score_sep + 1, file_name.find('_', score_sep + 1) - score_sep - 1);
                 scoreboard.append(pl_id);
+
+                // open the file and store the first line into a string named word
+                std::ifstream file("SCORES/" + file_name);
+                std::string word;
+                std::getline(file, word);   
+                word = word.substr(0, word.find(' '));
+                scoreboard.push_back(' ');
+                scoreboard.append(word);
+                scoreboard.push_back(' ');
+
+                // the nubmer of lines in the file is the number of guesses
+                int guesses = 0;
+                int good_guesses = 0;
+                while (std::getline(file, word)) {
+                    guesses++;
+                    if (word[0] == '1') {
+                        good_guesses++;
+                    }
+                }
+                scoreboard.append("Good guesses: " + std::to_string(good_guesses));
+                scoreboard.push_back(' ');
+                scoreboard.append("Total trials: " + std::to_string(guesses));
                 scoreboard.push_back('\n');
+
+                file.close();
+
             }
         }
         closedir (dir);
