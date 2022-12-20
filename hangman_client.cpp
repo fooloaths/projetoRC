@@ -502,10 +502,10 @@ void hint_aux_ok(std::string status) {
 
     // store the file_size of file_name into length
     std::ifstream file2(file_name, std::ios::binary | std::ios::ate);
-    length = file2.tellg();
+    auto file_size = file2.tellg();
     file2.close();
 
-    std::cout << "The hint is in the file " << file_name << "and it is " << length << " bytes\n";
+    std::cout << "The hint is in the file " << file_name << "and it is " << file_size << " bytes\n";
 }
 
 void hint(const char *server_ip, const char *server_port) {
@@ -539,7 +539,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     std::stringstream buffer;
     char byte[1];
     char file_data[BLOCK_SIZE];
-    int digits = 0;
+    ssize_t digits = 0;
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == -1) {
@@ -606,7 +606,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
 
     // read digits bytes into file_data vector in increments of BLOCK_SIZE
     while (digits > 0) {
-        auto to_read = digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits;
+        size_t to_read = (size_t) (digits > BLOCK_SIZE - 1 ? BLOCK_SIZE - 1 : digits);
         memset(file_data, 0, BLOCK_SIZE);
         n = read(fd, file_data, to_read);
 
@@ -615,12 +615,13 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
             close(fd);
             return NULL;
         }
-        if (n < to_read) {
-                to_read = n;
+
+        if ((size_t) n < to_read) {
+                to_read = (size_t) n;
         } 
 
         digits -= n;
-        buffer.write(file_data, to_read);
+        buffer.write(file_data, (ssize_t) to_read);
 
         if (n == 0) {
             break;
