@@ -500,6 +500,11 @@ void hint_aux_ok(std::string status) {
     file << useful_info;
     file.close();
 
+    // store the file_size of file_name into length
+    std::ifstream file2(file_name, std::ios::binary | std::ios::ate);
+    length = file2.tellg();
+    file2.close();
+
     std::cout << "The hint is in the file " << file_name << "and it is " << length << " bytes\n";
 }
 
@@ -672,7 +677,7 @@ void status_aux_ok(std::string status) {
         status.erase(status.find("     "), 5);
     }
 
-    std::cout << "Status was saved to " << file_name " with" << length << "bytes.\n";
+    std::cout << "Status was saved to " << file_name << "with" << length << " bytes.\n";
     std::cout << status;
     std::ofstream file(file_name);
     file << status;
