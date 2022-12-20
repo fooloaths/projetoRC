@@ -597,6 +597,10 @@ int exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in a
         return 1;
     }
 
+    if (id.empty()) {
+        inner_id = player_id;
+    }
+
     for (auto i : id) {
         if (!isdigit(i)) {
             inner_id = player_id;
