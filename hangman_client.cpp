@@ -263,6 +263,11 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
 std::string get_status(std::string message) {
     size_t i = 4; // Skip reply signature (RLG) and space
 
+    if (message.length() < 4) {
+        printf("Error: Invalid message. You have commited a Gonçalo Nunes error.\n");
+        exit(1);
+    }
+
     std::string status;
     // take off \n if it exists
     if (message[message.length() - 1] == '\n') {
