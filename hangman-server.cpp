@@ -249,7 +249,8 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
 
 void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
                 struct sockaddr_in addr, socklen_t addrlen, char buffer[]) {
-    int newfd;
+    int newfd, ret;
+    pid_t pid;
     char byte[1];
     memset(byte, '\0', sizeof byte);
 
@@ -269,45 +270,45 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         printf("Error (tcp_server): An error occured while binding the address to the TCP socket file descriptor\n"); 
         exit(1);
     }
-    if (errno == EACCES) {
-        printf("O erro é EACCESS\n");
-    }
-    else if (errno == EADDRINUSE) {
-        printf("O erro é EADDRINUSE\n");
-    }
-    else if (errno == EBADF) {
-        printf("O erro é EBADF\n");
-    }
-    else if (errno == EINVAL) {
-        printf("O erro é EINVAL\n");
-    }
-    else if (errno == ENOTSOCK) {
-        printf("O erro é ENOTSOCK\n");
-    }
-    else if (errno == EADDRNOTAVAIL) {
-        printf("O erro é EADDRNOTAVAIL\n");
-    }
-    else if (errno == EFAULT) {
-        printf("O erro é EFAULT\n");
-    }
-    else if (errno == ELOOP) {
-        printf("O erro é ELOOP\n");
-    }
-    else if (errno == ENAMETOOLONG) {
-        printf("O erro é ENAMETOOLONG\n");
-    }
-    else if (errno == ENOENT) {
-        printf("O erro é ENOENT\n");
-    }
-    else if (errno == ENOMEM) {
-        printf("O erro é ENOMEM\n");
-    }
-    else if (errno == ENOTDIR) {
-        printf("O erro é ENOTDIR\n");
-    }
-    else if (errno == EROFS) {
-        printf("O erro é EROFS\n");
-    }
+    // if (errno == EACCES) {
+    //     printf("O erro é EACCESS\n");
+    // }
+    // else if (errno == EADDRINUSE) {
+    //     printf("O erro é EADDRINUSE\n");
+    // }
+    // else if (errno == EBADF) {
+    //     printf("O erro é EBADF\n");
+    // }
+    // else if (errno == EINVAL) {
+    //     printf("O erro é EINVAL\n");
+    // }
+    // else if (errno == ENOTSOCK) {
+    //     printf("O erro é ENOTSOCK\n");
+    // }
+    // else if (errno == EADDRNOTAVAIL) {
+    //     printf("O erro é EADDRNOTAVAIL\n");
+    // }
+    // else if (errno == EFAULT) {
+    //     printf("O erro é EFAULT\n");
+    // }
+    // else if (errno == ELOOP) {
+    //     printf("O erro é ELOOP\n");
+    // }
+    // else if (errno == ENAMETOOLONG) {
+    //     printf("O erro é ENAMETOOLONG\n");
+    // }
+    // else if (errno == ENOENT) {
+    //     printf("O erro é ENOENT\n");
+    // }
+    // else if (errno == ENOMEM) {
+    //     printf("O erro é ENOMEM\n");
+    // }
+    // else if (errno == ENOTDIR) {
+    //     printf("O erro é ENOTDIR\n");
+    // }
+    // else if (errno == EROFS) {
+    //     printf("O erro é EROFS\n");
+    // }
 
     if (listen(fd, 5) == -1) {
         printf("Error (tcp_server): An error occured while marking the socket as a passive socket for listening\n"); 
@@ -319,60 +320,52 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         addrlen = sizeof(addr);
 
         /* Accept connection request */
-        if ((newfd = accept(fd, (struct sockaddr*)&addr, &addrlen)) == -1) {
+        do {
+            newfd = accept(fd, (struct sockaddr*)&addr, &addrlen);
+        } while (newfd == -1 && errno == EINTR);
+        if (newfd == -1) {
             printf("Error (tcp_server): An error occured while accepting a connection request\n"); 
             exit(1);
         }
 
-        /* Read from Socket */
-        //n = read(newfd, buffer, BLOCK_SIZE);
+        /* Fork a new process to process request */
+        if ((pid = fork()) == -1) {
+            printf("Error (tcp_server): Fork failed\n");
+        }
+        else if (pid == 0) { /* Child Process */
+            close(fd);
 
-        // std::string input_message;
-        // memset(&input_message, 0, sizeof(input_message));
-        while (byte[0] != '\n') {
-            // read BLOCK_SIZE blocks until \n
-            n = read(newfd, byte, 1);
-            if (n == -1) {
-                if (errno == EAGAIN) {
-                    printf("O erro é EAGAIN\n");
+            /* Read from Socket */
+            while (byte[0] != '\n') {
+                // read BLOCK_SIZE blocks until \n
+                n = read(newfd, byte, 1);
+                if (n == -1) {
+                    freeaddrinfo(res);
+                    close(fd);
+                    exit(1);
                 }
-                else if (errno == EBADF) {
-                    printf("O erro é EBADF\n");
-                }
-                else if (errno == EFAULT) {
-                    printf("O erro é EFAULT\n");
-                }
-                else if (errno == EINTR) {
-                    printf("O erro é EINTR\n");
-                }
-                else if (errno == EINVAL) {
-                    printf("O erro é EINVAL\n");
-                }
-                else if (errno == EIO) {
-                    printf("O erro é EIO\n");
-                }
-                else if (errno == EISDIR) {
-                    printf("O erro é EISDIR\n");
-                }
-                printf("Aqui?!?!?!\n");
-                freeaddrinfo(res);
-                close(fd);
-                exit(1);
+                input_message.push_back(byte[0]);
             }
-            input_message.push_back(byte[0]);
-        }
-        printf("tcp_server: The message is %s", input_message.c_str());
-        struct request *req = process_input(&(input_message.front()));
-        if (req == NULL) {
-            printf("Error (udp_server): Couldn't allocate memory to process request\n");
-        }
+            printf("tcp_server: The message is %s", input_message.c_str());
+            struct request *req = process_input(&(input_message.front()));
+            if (req == NULL) {
+                printf("Error (tcp_server): Couldn't allocate memory to process request\n");
+            }
 
-        /* Treat request */
-        treat_tcp_request(newfd, req);
-        free(req);
-
+            /* Treat request */
+            treat_tcp_request(newfd, req);
+            free(req);
+            close(newfd);
+            exit(0);
+        }
         /* Close connection */
-        close(newfd);
+        do {
+            close(newfd);
+        } while (ret == -1 && errno == EINTR);
+        if (ret == -1) {
+            printf("Error (tcp_server): Coudln't close file descriptor\n");
+            exit(1);
+        }
 
         /* Reset buffers */
         memset(buffer, '\0', BLOCK_SIZE);
