@@ -49,13 +49,13 @@ Mateus Pinho - ist199282
 #define SEED 73
 #define NUMBER_OF_WORDS 6       // TODO algumas destas constantes foram tiradas do rabo
 #define WORD_LINE_SIZE 25
+#define ARG_PORT "-p"
 
 
 void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
                 struct sockaddr_in addr, socklen_t addrlen, char buffer[]);
 void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
                 struct sockaddr_in addr, socklen_t addrlen, char buffer[]);
-void treat_tcp_request();
 int send_message(int fd, const char* message, size_t buf_size, struct sockaddr_in addr, socklen_t addrlen);
 struct request* process_input(char buffer[]);
 void create_game_session(std::string word, char moves, std::string PLID, std::string hint);
@@ -97,7 +97,9 @@ void create_directories();
 std::string compute_score(struct request *req);
 size_t create_temporary_state_file(struct request *req, int game_found, const char *fname);
 size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::string word, std::string hint, struct request *req, int active_game, const char *file_name);
-/*int FindTopScores(SCORELIST ∗list)*/
+void treat_scoreboard(struct request *req, int fd);
+std::string create_scoreboard_file();
+// // int FindTopScores(SCORELIST ∗list);
 
 struct request {
     std::string op_code;
@@ -121,8 +123,8 @@ struct game {
 
 std::unordered_map<std::string, struct game*> active_games;
 std::string word_file = "word_eng.txt";
+std::string port = PORT;
 FILE* fp_word_file;
-
 
 int main(int argc, char **argv) {
 
@@ -140,6 +142,13 @@ int main(int argc, char **argv) {
         printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
         return 1;
     }
+    if (argc > 2) {
+        std::string arg_1 = argv[2];
+        std::string arg_2 = argv[3];
+        if (arg_1 == ARG_PORT) {
+            port = arg_2;
+        }
+    }
 
     word_file = argv[1];
 
@@ -151,30 +160,31 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // int pid = fork();
-    // if (pid != 0) { /* Parent process */
-    //     /* UDP server */
-        //    fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
-        //    if (fd == -1) {
-        //        printf("Error (main): An error occured while attempting to create an UDP socket\n");
-        //        exit(1);
-        //    }
-        //    fp_word_file = fopen(word_file.c_str(), "r");
-        //    if (fp_word_file == NULL) {
-        //        printf("Error (main): Couldn't open word file.\n");
-        //        if (errno == EACCES) {
-        //            printf("    EACCES: Not enough permissions to open file\n");
-        //        }
-        //       /* Close socket and free resources */
-        //        freeaddrinfo(res);
-        //        close(fd);
+    // clone while sharing cout and cerr
+    int pid = fork();
+    if (pid != 0) { /* Parent process */
+        /* UDP server */
+          fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
+          if (fd == -1) {
+              printf("Error (main): An error occured while attempting to create an UDP socket\n");
+              exit(1);
+          }
+          fp_word_file = fopen(word_file.c_str(), "r");
+          if (fp_word_file == NULL) {
+              printf("Error (main): Couldn't open word file.\n");
+              if (errno == EACCES) {
+                  printf("    EACCES: Not enough permissions to open file\n");
+              }
+             /* Close socket and free resources */
+              freeaddrinfo(res);
+              close(fd);
 
-        //       return -1;
-        //    }
-        //   srand(SEED); /* Set seed for random num generator */
-        //   udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    //   }
-    // else {
+             return -1;
+          }
+         srand(SEED); /* Set seed for random num generator */
+         udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
+    }
+    else {
         /* TCP server */
         fd = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
         if (fd == -1) {
@@ -182,8 +192,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
         tcp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
-    // }
-
+    }
 
     return 0;
 }
@@ -197,7 +206,7 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     hints.ai_flags = AI_PASSIVE;
 
     printf("olá\n");
-    errorcode = getaddrinfo(NULL, PORT, &hints, &res);
+    errorcode = getaddrinfo(NULL, port.c_str(), &hints, &res);
     if (errorcode != 0) {
         printf("Error (udp_server): An error occured while getting an addrinfo structure\n");
         exit(1);
@@ -249,7 +258,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     hints.ai_socktype = SOCK_STREAM; //TCP socket
     hints.ai_flags = AI_PASSIVE;
 
-    errorcode = getaddrinfo(NULL, PORT, &hints, &res);
+    errorcode = getaddrinfo(NULL, port.c_str(), &hints, &res);
     if (errorcode != 0) {
         printf("Error (tcp_server): An error occured while getting an addrinfo structure\n");
         exit(1);
@@ -362,7 +371,6 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         treat_tcp_request(newfd, req);
         free(req);
 
-
         /* Close connection */
         close(newfd);
 
@@ -421,17 +429,25 @@ struct request* process_input(char buffer[]) {
     int i = 0;
     /* Retrieve op code defining the requested functionality from the server */
     printf("process_input: Starting OP CODE loop\n");
-    while (buffer[i] != ' ' && i < BLOCK_SIZE) {
+    while (buffer[i] != ' ' && i < BLOCK_SIZE && buffer[i] != '\n') {
 
         (req->op_code).push_back(buffer[i]);
 
         i++;
 
         if (i == BLOCK_SIZE) {
-            /* Should have never gotten this big */
+            /* Should have never gotten this big
+
+                pelo menos alguma coisa é big UwU
+            */
             req->error = TRUE;
             return req;
         }
+    }
+    if (req->op_code == GSB) {
+        /* Nothing more to parse */
+        req->letter_word = "NULL"; req->trial = "NULL"; req->PLID = "NULL";
+        return req;
     }
     i++;
 
@@ -442,7 +458,7 @@ struct request* process_input(char buffer[]) {
 
         (req->PLID).push_back(buffer[i]);
         i++;
-
+    
         if (i == BLOCK_SIZE) {
             /* Should have never gotten this big */
             req->error = TRUE;
@@ -461,7 +477,7 @@ struct request* process_input(char buffer[]) {
     if (req->op_code == QUT || req->op_code == REV || req->op_code == SNG || req->op_code == GSB ||
         req->op_code == STA || req->op_code == GHL) {
         /* Nothing more to parse */
-        printf("\nprocess_input: No need to continue\n");
+        printf("process_input: No need to continue\n");
         req->letter_word = "NULL"; req->trial = "NULL";
         return req;
     }
@@ -621,27 +637,130 @@ int treat_request(int fd, struct sockaddr_in addr, socklen_t addrlen, struct req
     Checks the op_code associated with the request and calls the sub-routine
     that implements that functionality */
 void treat_tcp_request(int fd, struct request *req) {
-    printf("treat_tcp_request: Starting function\n");
+    std::cout << "treat_tcp_request: Starting function\n";
+
+    // print the req->op_code
+    std::cerr << "treat_tcp_request: req->op_code = " << req->op_code << "yo mista white\n" << std::endl;
 
     if (req->error == TRUE) {
         /* Something in the given request is invalid */
         //report_error(fd, addr, addrlen, req);
         return;
     }
-
     if (req->op_code == STA) {
         /* Send game state */
+        printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
         treat_state(req, fd);
     }
     else if (req->op_code == GHL) {
         /* Send hint */
-        treat_hint(req, fd);
+        printf("Chegou ao hint!!!!!!!!!!!!!!!!!!!!\n");
+        treat_hint(req, fd);    
+    }
+    else if (req->op_code == GSB) {
+        /* Scoreboard */
+        // // std::cout << "treat_tcp_request: GSB request received\n";
+        treat_scoreboard(req, fd);
     }
     else {
         /* Invalid protocol message */
+        printf("TCP vai mandar ERR?!?!?!\n");
         std::string message = ERR + '\n'; // TODO see if other parts of req are invalid (Acho que já está feio ?)
-        //send_message(fd, message.c_str(), message.length(), addr, addrlen);
+        // send_message(fd, message.c_str(), message.length(), addr, addrlen);
     }
+}
+
+std::string create_scoreboard() {
+    // iterate through all the files in the SCORES folder, and store the file_name in a vector
+
+    std::cerr << "create_scoreboard: Starting function\n";
+
+    std::string scoreboard = "TOP 10 SCORES:\n";
+    DIR *dir;
+    struct dirent *ent;
+
+    // keep a vector of the ten highest scores
+    std::vector<int> top_scores;
+
+    if ((dir = opendir ("SCORES")) != NULL) {
+        while ((ent = readdir (dir)) != NULL) {
+            if (ent->d_name[0] != '.') {
+                std::string file_name = ent->d_name;
+                auto score_sep = file_name.find('_');
+
+                auto score = stoi(file_name.substr(0, score_sep));
+                // if the score is higher than the lowest score in the top_scores vector and there are less than 10 scores, add it to the vector
+                if (top_scores.size() < 10) {
+                    top_scores.push_back(score);
+                    std::sort(top_scores.begin(), top_scores.end());
+                }
+                else if (score > top_scores[0] && top_scores.size() == 10) {
+                    top_scores[0] = score;
+                    std::sort(top_scores.begin(), top_scores.end());
+                } else {
+                    continue;
+                }
+
+                
+                scoreboard.append(file_name.substr(0, score_sep));
+                scoreboard.push_back('\t');
+                // find the string from score_sep to the next underscore
+                auto pl_id = file_name.substr(score_sep + 1, file_name.find('_', score_sep + 1) - score_sep - 1);
+                scoreboard.append(pl_id);
+                scoreboard.push_back('\n');
+            }
+        }
+        closedir (dir);
+    } else {
+        /* could not open directory */
+        perror ("");
+        return "";
+    }
+
+    if (scoreboard == "TOP 10 SCORES:\n") {
+        return "EMPTY";
+    }
+
+    std::cout << "create_scoreboard: scoreboard = " << scoreboard << std::endl;
+    return scoreboard;
+    
+}
+
+/* Treat scoreboard
+
+    Written by the great and powerful footvaalvica, the mighty and powerful.
+
+    This function is called when the client sends a scoreboard request.
+    It will send the scoreboard to the client.
+*/
+void treat_scoreboard(struct request *req, int fd) {
+    auto message = create_scoreboard();
+    //get current unix time in seconds
+    auto time = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    std::string file_name = "SCOREBOARD_" + std::to_string(time) + ".txt ";
+    std::string file_length = std::to_string(message.size() + 1) + " ";
+
+    if (message == "") {
+        message = ERR + '\n';
+    }
+    else if (message == "EMPTY") {
+        message = "RSB EMPTY\n";
+    }
+    else {
+        message = "RSB OK " + file_name + file_length + message + '\n';
+    }
+
+    std::cout << "treat_scoreboard: message = " << message << std::endl;
+
+    ssize_t n = write(fd, message.c_str(), message.length());
+    if (n == -1) {
+        
+        /*freeaddrinfo(res);
+        close(fd);*/
+        exit(1);
+    }
+
+    return;
 }
 
 
@@ -649,7 +768,7 @@ void treat_state(struct request *req, int fd) {
     // printf("treat_state: Starting function\n");
 
     int i = 0;
-    std::string status;
+    std::string status; 
     std::string message = RST;
     // printf("treat_state: Message is currently: %s\n", message.c_str());
     int found = check_for_active_game(req);
@@ -1523,7 +1642,7 @@ std::string get_current_date_and_time(std::string directory) {
       - If play was unsuccessful with some attempts remaining:
         Update game file */
 void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req) {
-    std::string message = RWG;
+    std::string message = RLG;
     message.push_back(' ');
 
     /* Look for active games with req->PLID */
@@ -1537,6 +1656,7 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     /* Compare number of moves to req->trials */
     std::string move_number = get_game_trials(req);
     std::string moves = " " + move_number + "\n";
+    printf("O req->trial = %s e o move_number = %s\n", (req->trial).c_str(), move_number.c_str());
     if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
         message = message + INV + moves;

@@ -1,0 +1,30 @@
+start 100001
+quit
+start 100002
+quit
+start 100003
+play c
+play f
+play e
+play g
+play h
+play j
+play l
+play k
+play o
+play p
+play i
+play q
+play r
+play s
+play n
+play u
+play b
+play a
+play z
+play m
+play y
+play t
+play v
+play d
+exit
