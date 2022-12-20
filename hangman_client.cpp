@@ -656,6 +656,8 @@ void status(const char* server_ip, const char* server_port) {
 }
 
 void status_aux_ok(std::string status) {
+    // TODO remove specific number of spaces handler
+
     // split the string into two strings after the first tab
 
     // file_name is between the second space and the third space
@@ -669,8 +671,9 @@ void status_aux_ok(std::string status) {
     while (status.find("     ") != std::string::npos) {
         status.erase(status.find("     "), 5);
     }
-    std::cout << status;
 
+    std::cout << "Status was saved to " << file_name " with" << length << "bytes.\n";
+    std::cout << status;
     std::ofstream file(file_name);
     file << status;
     file.close();
