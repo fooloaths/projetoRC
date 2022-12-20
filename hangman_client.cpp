@@ -230,8 +230,8 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     // TODO fix input splitting    
     std::string response_command = response.substr(0 , response.find(' '));
     if (response_command == ERR) {
-        std::cout << "el servidor no esta muy bueno ya?\n";
-        exit(1);
+        std::cout << "The command is wrong.\n";
+        return;
     }
     
     // TODO fix input splitting
@@ -371,6 +371,8 @@ void guess(std::string guess_word, int fd, struct addrinfo *res, struct sockaddr
     if (status.compare(WIN) == 0) {
         printf("YOU ARE A GENIUS!!! THE WORD WAS %s\n", 
         guess_word.c_str());
+    } else if (status == "DUP") {
+        printf("YOU ALREADY TRIED THIS WORD!!!\n");
     } else if (status.compare(NOK) == 0) {
         printf("YOU ARE WRONG!!!\n");
     } else if (status.compare(OVR) == 0) {
@@ -493,7 +495,7 @@ void hint_aux_ok(std::string status) {
     file << useful_info;
     file.close();
 
-    std::cout << "The hint is in the file " << file_name << std::endl;
+    std::cout << "The hint is in the file " << file_name << "and it is " << length << " bytes\n";
 }
 
 void hint(const char *server_ip, const char *server_port) {
@@ -702,10 +704,12 @@ void exit_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in 
     response = response.substr(0, response.find('\n') + 1);
 
     std::string status = get_status(response);
-    if (status.compare(OK) == 0) {
+    if (status == "OK") {
         printf("GOODBYE :3\n");
+    } else if (status == "NOK") {
+        printf("Player doesn't have an ongoing game.\n");
     } else {
-        printf("Player doesn't have an ongoing game or the connection wasn't properly closed.\n");
+        printf("The connection wasn't properly closed.\n");
     }
 
     return;
