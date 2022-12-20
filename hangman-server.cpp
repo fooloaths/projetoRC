@@ -1704,12 +1704,12 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
         increment_game_trials(req);
         if (get_game_errors(req) == max_tries(word)) { // No more errors
             /* Prepare reply for client */
-            message = message + OVR + moves;
+            message = message + OVR + moves + "\n";
             move_to_SCORES(req, F);
         }
         else { // Incorrect guess, but with remaining attempts
             /* Prepare reply for client */
-            message = message + NOK + moves;
+            message = message + NOK + moves + "\n";
         }
     }
     printf("treat_play: The message being sent is\n%s\n", message.c_str());
