@@ -1909,7 +1909,7 @@ int won_game(struct request *req) {
 void report_error(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req) {
     std::string message;
 
-    if (req->op_code == PWG || req->op_code == RLG) {
+    if (req->op_code == PWG || req->op_code == PLG) {
         /* Invalid guess or play request */
         message = req->op_code + " ";
     }
