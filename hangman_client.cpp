@@ -537,7 +537,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     ssize_t n;
     struct addrinfo hints, *res;
     std::stringstream buffer;
-    char byte[1];
+    char byte[1] = {0};
     char file_data[BLOCK_SIZE];
     ssize_t digits = 0;
 
