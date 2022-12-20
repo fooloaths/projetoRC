@@ -53,9 +53,9 @@ Mateus Pinho - ist199282
 
 
 void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
-                struct sockaddr_in addr, socklen_t addrlen, char buffer[]);
+                struct sockaddr_in addr, char buffer[]);
 void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
-                struct sockaddr_in addr, socklen_t addrlen, char buffer[]);
+                struct sockaddr_in addr, char buffer[]);
 int send_message(int fd, const char* message, size_t buf_size, struct sockaddr_in addr, socklen_t addrlen);
 struct request* process_input(char buffer[]);
 void create_game_session(std::string word, char moves, std::string PLID, std::string hint);
@@ -131,8 +131,8 @@ FILE* fp_word_file;
 int main(int argc, char **argv) {
 
     int fd, errorcode = 0;
-    ssize_t n;
-    socklen_t addrlen;
+    ssize_t n = 0;
+    // socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
     struct sigaction act;
@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
              return -1;
           }
          srand(SEED); /* Set seed for random num generator */
-         udp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
+         udp_server(hints, res, fd, errorcode, n, addr, buffer);
     }
     else {
         /* TCP server */
@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
             printf("Error (main): An error occured while attempting to create an TCP socket\n");
             exit(1);
         }
-        tcp_server(hints, res, fd, errorcode, n, addr, addrlen, buffer);
+        tcp_server(hints, res, fd, errorcode, n, addr, buffer);
     }
 
     return 0;
@@ -201,7 +201,10 @@ int main(int argc, char **argv) {
 
 
 void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
-                struct sockaddr_in addr, socklen_t addrlen, char buffer[]) {
+                struct sockaddr_in addr, char buffer[]) {
+    
+    socklen_t addrlen;
+
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET; // IPv4
     hints.ai_socktype = SOCK_DGRAM; // UDP socket
@@ -250,7 +253,8 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
 
 
 void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorcode, ssize_t n,
-                struct sockaddr_in addr, socklen_t addrlen, char buffer[]) {
+                struct sockaddr_in addr, char buffer[]) {
+    socklen_t addrlen;
     int newfd, ret = 0;
     pid_t pid;
     char byte[1];
@@ -532,7 +536,7 @@ int valid_PLID(std::string PLID) {
     }
 
     /* Check that all characters in PLID are digits */
-    int i = 0;
+    size_t i = 0;
     while (PLID[i] != '\0') {
 
         if (PLID[i] < '0' || PLID[i] > '9') {
@@ -574,7 +578,7 @@ std::string get_random_line_from_file() {
 
     /* Fetch a random line from the file */
     while (getline(&buffer, &buf_size, fp_word_file)) {
-        if (line_num == line) {
+        if (line_num == file_line) {
             break;
         }
         line_num++;
@@ -764,7 +768,7 @@ void treat_scoreboard(struct request *req, int fd) {
 void treat_state(struct request *req, int fd) {
     // printf("treat_state: Starting function\n");
 
-    int i = 0;
+    // size_t i = 0;
     std::string status; 
     std::string message = RST;
     // printf("treat_state: Message is currently: %s\n", message.c_str());
@@ -857,7 +861,7 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
     state_file = fopen(state_file_name.c_str(), "w");
     if (state_file == NULL) {
         printf("Error (create_temporary_state_file): State file couldn't be created\n");
-        return -1;
+        return 0;
     }
 
     /* Open last active game file for reading */
@@ -865,7 +869,7 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
     game_file = fopen(fname, "r");
     if (game_file == NULL) {
         printf("Error (create_temporary_state_file): Couldn't open game file for reading\n");
-        return -1;
+        return 0;
     }
 
     /* Exctract word and hint from game file */ // TODO esta parte ainda só funciona se for um active game file
@@ -879,7 +883,7 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
 
     /* Read */
     char *line = (char *) malloc(BLOCK_SIZE * sizeof(char)); // TODO isto está feito à bruta. o malloc está big boy
-    int line_num = 1;
+    // size_t line_num = 1;
     size_t buf_size = BLOCK_SIZE;
     std::vector<std::string> trials; /* Vector with all trial lines to be appended to file */
 
@@ -956,9 +960,9 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
 
     /* Write trials/guesses */
     // int i = 0;
-    for (auto line: trials) {
-        printf("Write_to_temp_file: Writing trial\n%s", line.c_str());
-        n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
+    for (auto line_it: trials) {
+        printf("Write_to_temp_file: Writing trial\n%s", line_it.c_str());
+        n = n + fwrite(line_it.c_str(), sizeof(char), line_it.length(), file);
         // i++;
         printf("Write_to_temp_file: Currently wrote %ld bytes\n", n);
         // if (i == trials.size()) {
@@ -975,7 +979,7 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
     }
     else {
         // line = CURRENTLY_SOLVED + get_word_knowledge(req) + "\n";
-        printf("Write_to_temp_file: Writing current knowledge of word\n", line.c_str());
+        // printf("Write_to_temp_file: Writing current knowledge of word\n", line.c_str());
     }
     // n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
     // printf("Write_to_temp_file: Currently wrote %ld bytes\n", n);
@@ -1090,7 +1094,7 @@ std::string get_first_line_from_game_file(struct request *req) { // TODO check i
     Receives a string and returns the first word (all characters up to the
     first space) */
 std::string get_word(std::string line) {
-    int i = 0;
+    size_t i = 0;
 
     std::string output;
     while (line[i] != ' ') {
@@ -1103,7 +1107,7 @@ std::string get_word(std::string line) {
 /* Get Hint:
     Receives a string and returns the second word */
 std::string get_hint(std::string line) {
-    int i = 0;
+    size_t i = 0;
 
     std::string output;
     /* Skip word */
@@ -1153,7 +1157,7 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
         // TODO if duplicate guess, also reply INV
-        printf("treat_guess: req->trial = %s , move_number = %s\n", req->trial, move_number);
+        printf("treat_guess: req->trial = %s , move_number = %s\n", (req->trial).c_str(), move_number.c_str());
         printf("treat_guess: Going to send INV\n");
         message = message + INV + moves;
         printf("Treat_guess: Sending the following\n%s", message.c_str());
@@ -1454,7 +1458,7 @@ int compare_plays(struct request *req, std::string line) {
             return -1;
     }
     
-    int i = 0;
+    size_t i = 0;
     while (line[i] != ' ') {i++;} // Skip code
     i++; // Skip space
 
@@ -1727,9 +1731,9 @@ std::string positions(char letter, std::string word) {
 
     std::string output;
     int pos = 1;
-    int length = word.length();
+    size_t length = word.length();
     int number_occ = 0;
-    for (int i = 0; i < length; i++) {
+    for (size_t i = 0; i < length; i++) {
         if (word[i] == letter) {
             output = output + std::to_string(pos) + " ";
             number_occ++;
@@ -1795,7 +1799,7 @@ void update_game(struct request *req) {
     /* Update move number */
     increment_game_trials(req);
 
-    int i = 0;
+    size_t i = 0;
     for (auto c: g->word) {
         /* Iterate over word. If char i in word matches the guessed letter,
             update current knowledge of the word */
