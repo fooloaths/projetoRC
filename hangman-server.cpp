@@ -580,11 +580,15 @@ std::string get_random_line_from_file() {
     /* Fetch a random line from the file */
     while (getline(&buffer, &buf_size, fp_word_file)) {
         if (line_num == file_line) {
+            file_line++;
             break;
         }
         line_num++;
         memset(buffer, '\0', WORD_LINE_SIZE);
     }
+
+    /* Reset file offset */
+    fseek(fp_word_file, 0, SEEK_SET);
 
     std::string output = buffer;
     free(buffer);
