@@ -677,7 +677,7 @@ void status_aux_ok(std::string status) {
         status.erase(status.find("     "), 5);
     }
 
-    std::cout << "Status was saved to " << file_name << "with" << length << " bytes.\n";
+    std::cout << "Status was saved to " << file_name << "with " << length << " bytes.\n";
     std::cout << status;
     std::ofstream file(file_name);
     file << status;
