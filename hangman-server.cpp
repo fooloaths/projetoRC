@@ -119,6 +119,7 @@ struct game {
     std::string word_knowledge;
     int errors;
     int n_succs;
+    int int_move_number;
 };
 
 
@@ -1777,8 +1778,11 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     /* Populate it */
     new_game->word = word;
     new_game->PLID = PLID;
+    // new_game->max_errors = moves;
     new_game->max_errors = moves;
+    new_game->n_succs = 0;
     new_game->errors = 0;
+    new_game->int_move_number = 1;
     new_game->move_number = "1";
     new_game->hint_file = hint;
     
@@ -1866,6 +1870,7 @@ void increment_game_trials(struct request *req) {
     /* Update move number */
     int moves = std::stoi(req->trial) + 1;
     g->move_number = std::to_string(moves);
+    g->int_move_number++;
 }
 
 
@@ -1879,6 +1884,7 @@ void decrement_game_trials(struct request *req) {
     /* Update move number */
     int moves = std::stoi(req->trial) - 1;
     g->move_number = std::to_string(moves);
+    g->int_move_number--;
 }
 
 /* Won Game:
@@ -2028,7 +2034,8 @@ std::string compute_score(struct request *req) {
     struct game *g = it->second;
 
     /* Update move number */
-    int score = g->n_succs / std::stoi(g->move_number);
+    // int score = g->n_succs / std::stoi(g->move_number);
+    int score = g->n_succs / g->int_move_number;
 
     return std::to_string(score);
 }
