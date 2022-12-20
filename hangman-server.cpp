@@ -1869,6 +1869,9 @@ void increment_game_trials(struct request *req) {
 
     /* Update move number */
     int moves = std::stoi(req->trial) + 1;
+    if (req->trial.length() < (std::to_string(moves)).length()) {
+        g->move_number.resize((std::to_string(moves)).length());
+    }
     g->move_number = std::to_string(moves);
     g->int_move_number++;
 }
