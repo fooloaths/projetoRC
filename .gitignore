@@ -62,5 +62,6 @@ STATE_*
 *.svg
 SCOREBOARD_*
 GAMES/*
+SCORES/*
 tests/tmp/*
 tests/tmp/*
