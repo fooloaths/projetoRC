@@ -724,12 +724,10 @@ std::string create_scoreboard() {
 
                 // the nubmer of lines in the file is the number of guesses
                 int guesses = 0;
-                int good_guesses = 0;
                 while (std::getline(file, word)) {
                     guesses++;
-                    if (word[0] == '1') {
-                        good_guesses++;
-                    }
+
+                    
                 }
                 scoreboard.append("Good guesses: " + std::to_string(good_guesses));
                 scoreboard.push_back(' ');
