@@ -1135,7 +1135,6 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
 
     if (word == req->letter_word) { // Won the game
         /* Prepare reply for client */
-        increment_game_success(req);
         message = message + WIN + moves;
         move_to_SCORES(req, W);
     }
@@ -1670,7 +1669,7 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
         if (won_game(req)) {
             /* Won the game */
             increment_game_trials(req);
-            message = message + WIN + "\n";
+            message = message + WIN + moves + "\n";
             move_to_SCORES(req, W);
 
             // TODO falta mudar para completed GAMES subdir
