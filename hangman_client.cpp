@@ -59,17 +59,18 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in addr;
 
     // check if the number of arguments is correct
-    if (argc != 3) {
-        std::cout << "Usage: ./hangman_client <server_ip> <server_port>" << std::endl;
+    if (argc > 5) {
+        std::cout << "Usage: ./hangman_client -p server_ip -n server_port" << std::endl;
         exit(1);
     }
 
     // get the server's IP address and port number
-    char *server_ip = argv[1];
+    char *server_ip = argv[2];
     if (strcmp(server_ip, "") == 0) {
         server_ip = (char*)GSIP;
     }
-    char *server_port = argv[2];
+
+    char *server_port = argv[4];
     if (strcmp(server_port, "") == 0) {
         server_port = (char*)GSPORT;
     }
