@@ -504,9 +504,7 @@ void hint_aux_ok(std::string status) {
     auto third_space = status.find(' ', second_space) + 1;
     auto fourth_space = status.find(' ', third_space) + 1;
     auto length = third_space - second_space;
-    auto file_name = status.substr(second_space, length);
-
-    std::cerr << "file_name:" << file_name << "YO MISTA WHITE\n";
+    auto file_name = status.substr(second_space, length - 1);
 
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
@@ -524,7 +522,7 @@ void hint_aux_ok(std::string status) {
     auto file_size = file2.tellg();
     file2.close();
 
-    std::cout << "The hint is in the file " << file_name << "and it is " << file_size << " bytes\n";
+    std::cout << "The hint is in the file " << file_name << " and it is " << file_size << " bytes\n";
 }
 
 void hint(const char *server_ip, const char *server_port) {
