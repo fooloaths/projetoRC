@@ -33,7 +33,7 @@ std::string player_id = "";
 std::string word = "";
 
 /* Constants */
-const auto GSIP = "localhost";
+const auto GSIP = "127.0.0.1";
 const auto GSPORT = "58046";
 
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
@@ -57,22 +57,28 @@ int main(int argc, char *argv[]) {
     int fd, errorcode;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
+    char *server_ip, *server_port;
 
     // check if the number of arguments is correct
-    if (argc > 5) {
+    if (argc == 1) {
+        server_ip = (char*)GSIP;
+        server_port = (char*)GSPORT;
+    } else if (argc > 5) {
         std::cout << "Usage: ./hangman_client -p server_ip -n server_port" << std::endl;
         exit(1);
-    }
+    } else if (argc > 1 && argc < 5){ 
+        std::cout << "Please specify nothing or both the PORT and the IP" << std::endl;
+        exit(1);
+    } else {
+        server_ip = argv[2];
+        if (strcmp(server_ip, "") == 0) {
+            server_ip = (char*)GSIP;
+        }
 
-    // get the server's IP address and port number
-    char *server_ip = argv[2];
-    if (strcmp(server_ip, "") == 0) {
-        server_ip = (char*)GSIP;
-    }
-
-    char *server_port = argv[4];
-    if (strcmp(server_port, "") == 0) {
-        server_port = (char*)GSPORT;
+        server_port = argv[4];
+        if (strcmp(server_port, "") == 0) {
+            server_port = (char*)GSPORT;
+        }   
     }
 
     // create a socket
