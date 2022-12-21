@@ -506,6 +506,8 @@ void hint_aux_ok(std::string status) {
     auto length = third_space - second_space;
     auto file_name = status.substr(second_space, length);
 
+    std::cerr << "file_name:" << file_name << "YO MISTA WHITE\n";
+
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
     // // useful_info = useful_info.substr(0, useful_info.length() - 1);
