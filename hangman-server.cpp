@@ -1559,11 +1559,13 @@ void treat_quit(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     std::string message = RQT;
     message.push_back(' ');
     std::string status;
-    if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
+    if (valid_PLID(req->PLID) == -1 || req->error == TRUE) {
         /* No active game or invalid PLID */
-        printf("no game?!?!\n");
-        move_to_SCORES(req, Q);
+        // move_to_SCORES(req, Q);
         status = ERR;
+    }
+    else if (check_for_active_game(req) == -1) {
+        status = NOK;
     }
     else {
         /* Close game and move file to SCORES */
