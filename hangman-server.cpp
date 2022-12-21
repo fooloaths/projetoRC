@@ -382,6 +382,7 @@ struct request* process_input(char buffer[]) {
     printf("\nprocess_input: Starting function\n");
 
     printf("process_input: Allocating memory for request structure\n");
+    printf("process_input: O request foi = %s", buffer);
     struct request *req = (struct request *) malloc(sizeof(struct request));
     
     /* Check if memory for the request was correctly allocated */
@@ -419,6 +420,7 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
+    printf("process_input: O OP_CODE = %s\n", req->op_code.c_str());
     if (req->op_code == GSB) {
         /* Nothing more to parse */
         req->letter_word = "NULL"; req->trial = "NULL"; req->PLID = "NULL";
@@ -440,6 +442,7 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
+    printf("process_input: PLID = %s\n", req->PLID.c_str());
     i++;
 
     if (valid_PLID(req->PLID) == -1) {
@@ -1944,7 +1947,7 @@ int file_exists(std::string name) {
 void treat_hint(struct request *req, int fd) {
     std::string message = RHL;
     message.push_back(' ');
-    // printf("treat_hint: Starting function. The message is currently\n%s\n", message.c_str());
+    printf("treat_hint: Starting function. The message is currently\n%s\n", message.c_str());
 
     /* Look for active games with req->PLID */
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
@@ -1960,31 +1963,31 @@ void treat_hint(struct request *req, int fd) {
         return;
     }
     message = message + OK + " ";
-    // printf("treat_hint: Game found. The message is currently\n%s\n", message.c_str());
+    printf("treat_hint: Game found. The message is currently\n%s\n", message.c_str());
 
     /* Get name of hint file */
     std::string game_path = ACTIVE_GAME_PATH + req->PLID + TXT;
     // std::string line = get_word_and_hint(game_path);
     char *line = get_word_and_hint(game_path);
     std::string hint = get_hint(line);
-    // printf("treat_hint: The hint is\n%s\n", hint.c_str());
+    printf("treat_hint: The hint is\n%s\n", hint.c_str());
 
     message = message + hint + " ";
-    // printf("treat_hint: The message is now\n%s\n", message.c_str());
+    printf("treat_hint: The message is now\n%s\n", message.c_str());
 
     /* Open hint file */
     std::string hint_path = PICTURES + hint;
-    // printf("treat_hint: Opening file (read binary) with path\n%s\n", hint_path.c_str());
+    printf("treat_hint: Opening file (read binary) with path\n%s\n", hint_path.c_str());
     FILE *file = fopen(hint_path.c_str(), "rb");
 
     /* Get file size */
     fseek(file, 0, SEEK_END); // Place offset at the end of file
     ssize_t size = ftell(file); // Get offset value
     fseek(file, 0, SEEK_SET); // Set offset back to the start of file
-    // printf("treat_hint: File size is %ld bytes\n", size);
+    printf("treat_hint: File size is %ld bytes\n", size);
 
     message = message + std::to_string(size) + " ";
-    // printf("treat_hint: The message is now\n%s\n", message.c_str());
+    printf("treat_hint: The message is now\n%s\n", message.c_str());
     fclose(file);
     
     /* Read file content */
@@ -2000,7 +2003,7 @@ void treat_hint(struct request *req, int fd) {
 
 
     message = message + "\n";
-    // printf("treat_hint: Message being sent is\n%s", message.c_str());
+    printf("treat_hint: Message being sent is\n%s", message.c_str());
     /* Send reply */
     tcp_write(fd, message);
     // ssize_t n = write(fd, message.c_str(), message.length());
@@ -2063,6 +2066,7 @@ void tcp_write(int fd, std::string message) {
         }
         bytes = bytes - n;
         ptr = ptr + n;
+        printf("tcp_write: This time wrote %ld bytes and we still need to write %ld bytes\n", n, bytes);
     }
 }
 
