@@ -15,7 +15,7 @@ run_command() {
     echo "Testing $1"
     FILE_NAME=$(basename $1 .txt)
     TEST=$(echo $FILE_NAME | cut -d'_' -f2)
-    COMMAND=$(echo "192.168.1.5 58046 $TEST" | $TEJO > tests/tmp/report-$TEST.html)
+    COMMAND=$(echo "192.168.1.3 58046 $TEST" | $TEJO > tests/tmp/report-$TEST.html)
     if [ ! -s tests/tmp/report-$TEST.html ] || grep -q "color=\"red\"" tests/tmp/report-$TEST.html; then
         echo -e "${RED}Test failed${NC}"
     else

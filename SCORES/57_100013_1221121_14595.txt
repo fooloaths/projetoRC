@@ -1,0 +1,8 @@
+manipulator mmmm.jpeg
+T a
+T b
+T m
+T p
+T z
+G manipulator
+2

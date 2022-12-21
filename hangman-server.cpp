@@ -163,6 +163,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    
+
     // clone while sharing cout and cerr
     int pid = fork();
     if (pid != 0) { /* Parent process */
@@ -196,6 +198,8 @@ int main(int argc, char **argv) {
         }
         tcp_server(hints, res, fd, errorcode, n, addr, buffer);
     }
+
+    
 
     return 0;
 }
