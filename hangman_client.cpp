@@ -32,6 +32,10 @@ int move_number = 0;
 std::string player_id = "";
 std::string word = "";
 
+/* Constants */
+const auto GSIP = "localhost";
+const auto GSPORT = "58046";
+
 void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockaddr_in addr);
 std::string receive_message(int fd, sockaddr_in addr, size_t buf_size);
 void send_message(int fd, char message[], size_t buf_size, struct addrinfo *res);
@@ -62,7 +66,13 @@ int main(int argc, char *argv[]) {
 
     // get the server's IP address and port number
     char *server_ip = argv[1];
+    if (strcmp(server_ip, "") == 0) {
+        server_ip = (char*)GSIP;
+    }
     char *server_port = argv[2];
+    if (strcmp(server_port, "") == 0) {
+        server_port = (char*)GSPORT;
+    }
 
     // create a socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
