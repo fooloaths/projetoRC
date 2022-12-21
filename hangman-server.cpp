@@ -58,7 +58,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
                 struct sockaddr_in addr, char buffer[]);
 int send_message(int fd, const char* message, size_t buf_size, struct sockaddr_in addr, socklen_t addrlen);
 struct request* process_input(char buffer[]);
-void create_game_session(std::string word, char moves, std::string PLID, std::string hint);
+void create_game_session(std::string word, char moves, std::string PLID, std::string hint, struct request *req);
 std::string get_random_line_from_file();
 void create_active_game_file(std::string game, struct request *req);
 int valid_PLID(std::string PLID);
@@ -92,6 +92,10 @@ void increment_game_success(struct request *req);
 void decrement_game_trials(struct request *req);
 std::string get_game_errors(struct request *req);
 std::string get_game_trials(struct request *req);
+void set_last_reply(struct request *req, std::string message);
+void set_last_request(struct request *req, std::string message);
+std::string get_last_request(struct request *req);
+std::string get_last_reply(struct request *req);
 int file_exists(std::string name);
 void create_directories();
 std::string compute_score(struct request *req);
@@ -107,6 +111,7 @@ struct request {
     std::string PLID;
     std::string letter_word;
     std::string trial;
+    std::string full_request;
     int error;
 };
 
@@ -117,6 +122,8 @@ struct game {
     std::string move_number;
     std::string hint_file;  // TODO meter o hint file aqui durante o treat request
     std::string word_knowledge;
+    std::string last_reply;
+    std::string last_request;
     int errors;
     int n_succs;
     int int_move_number;
@@ -390,6 +397,9 @@ struct request* process_input(char buffer[]) {
     memset(&(req->letter_word), 0, sizeof(req->letter_word));
     memset(&(req->trial), 0, sizeof(req->trial));
     memset(&(req->PLID), 0, sizeof(req->PLID));
+    memset(&(req->full_request), 0, sizeof(req->full_request));
+
+    req->full_request = buffer;
 
     int i = 0;
     /* Retrieve op code defining the requested functionality from the server */
@@ -799,7 +809,6 @@ void treat_state(struct request *req, int fd) {
         found = -1;
     }
     else {
-        // printf("treat_state: A game was found!!!\n");
         std::string path = ACTIVE_GAME_PATH + req->PLID + TXT;
         sprintf(game_path, "%s", path.c_str());
         status = ACT;
@@ -830,7 +839,9 @@ void treat_state(struct request *req, int fd) {
     /* Delete temp file */
     std::string delete_command = "rm ";
     delete_command = delete_command + file_name;
-    system(delete_command.c_str());
+    if (file_exists(file_name) == 0) {
+        system(delete_command.c_str());
+    }
 }
 
 /* Create Temporary State File:
@@ -960,13 +971,18 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     std::string status;
     std::string message = RSG;
     std::string suffix = " ";
+    int game_no_moves = 0;
     message.push_back(' ');
 
     std::string game_path = ACTIVE_GAME_PATH + req->PLID + ".txt";
 
     int found = file_exists(game_path);
-    if (found == -1) {
+    if (found == -1 || (found == 0 && (game_no_moves = get_move_number(req)) == 1)) {
         /* No active game found for player PLID */
+        if (found == 0) {
+            send_message(fd, get_last_reply(req).c_str(), get_last_reply(req).length(), addr, addrlen);
+            return;
+        }
 
         status = OK;
         std::string line = get_random_line_from_file();
@@ -976,7 +992,7 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
         suffix = suffix + std::to_string(word.length());
         std::string moves = max_tries(word);
         suffix.push_back(' '); suffix.push_back(moves.front());
-        create_game_session(word, moves.front(), req->PLID, hint);
+        create_game_session(word, moves.front(), req->PLID, hint, req);
         create_active_game_file(line, req);
     }
     else {
@@ -987,6 +1003,7 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
         message = message + suffix;
     }
     message = message + "\n";
+    set_last_reply(req, message);
 
     printf("treat_start: The message being sent is\n%s", message.c_str());
     send_message(fd, message.c_str(), message.length(), addr, addrlen);
@@ -1555,7 +1572,6 @@ void move_to_SCORES(struct request *req, char code) {
     any server side information regarding the active game is freed and 
     the game file is moved */
 void treat_quit(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req) {
-    printf("aaasdfasfasdasd\n");
     std::string message = RQT;
     message.push_back(' ');
     std::string status;
@@ -1569,7 +1585,6 @@ void treat_quit(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     }
     else {
         /* Close game and move file to SCORES */
-        printf("Game found\n");
         move_to_SCORES(req, Q);
         status = OK;
     }
@@ -1740,7 +1755,7 @@ std::string positions(char letter, std::string word) {
 /* Create Game Session:
     Creates and populates a new struct game, adds it to the
     active_games unordered_map (hash map) and returns a pointer to it */
-void create_game_session(std::string word, char moves, std::string PLID, std::string hint) {
+void create_game_session(std::string word, char moves, std::string PLID, std::string hint, struct request *req) {
     struct game *new_game = (struct game *) malloc(sizeof(struct game));
     if (new_game == NULL) {
         printf("Error (create_game_session): Ran out of memory\n");
@@ -1753,18 +1768,20 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     memset(&(new_game->move_number), 0, sizeof(new_game->move_number));
     memset(&(new_game->hint_file), 0, sizeof(new_game->hint_file));
     memset(&(new_game->word_knowledge), 0, sizeof(new_game->word_knowledge));
+    memset(&(new_game->last_reply), 0, sizeof(new_game->last_reply));
+    memset(&(new_game->last_request), 0, sizeof(new_game->last_request));
 
 
     /* Populate it */
     new_game->word = word;
     new_game->PLID = PLID;
-    // new_game->max_errors = moves;
     new_game->max_errors = moves;
     new_game->n_succs = 0;
     new_game->errors = 0;
     new_game->int_move_number = 1;
     new_game->move_number = "1";
     new_game->hint_file = hint;
+    new_game->last_request = req->full_request;
     
     for (auto it = new_game->word.begin(); it != new_game->word.end(); it++) {
         new_game->word_knowledge.push_back('_');
@@ -2051,4 +2068,40 @@ void tcp_write(int fd, std::string message) {
         bytes = bytes - n;
         ptr = ptr + n;
     }
+}
+
+/* Set last reply
+
+    Sets assigns message to game->last_reply */
+void set_last_reply(struct request *req, std::string message) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    g->last_reply = message;
+}
+
+/* Set last request
+
+    Sets assigns message to game->last_request */
+void set_last_request(struct request *req, std::string message) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    g->last_request = message;
+}
+
+/* Get last reply */
+std::string get_last_reply(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    return g->last_reply;
+}
+
+/* Get last request */
+std::string get_last_request(struct request *req) {
+    auto it = active_games.find(req->PLID); // Gets iterator pointing to game
+    struct game *g = it->second;
+
+    return g->last_request;
 }
