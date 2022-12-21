@@ -634,11 +634,8 @@ void treat_tcp_request(int fd, struct request *req) {
 
 std::string create_scoreboard() {
     // iterate through all the files in the SCORES folder, and store the file_name in a vector
-
     std::cerr << "create_scoreboard: Starting function\n";
     std::vector<std::string> scoreboard;
-    // keep a vector of the ten highest scores
-    std::vector<int> top_scores;
 
     DIR *dir;
     struct dirent *ent;
@@ -651,19 +648,7 @@ std::string create_scoreboard() {
                 std::string scoreboard_line = "";
 
                 auto score = stoi(file_name.substr(0, score_sep));
-                // if the score is higher than the lowest score in the top_scores vector and there are less than 10 scores, add it to the vector
-                if (top_scores.size() < 10) {
-                    top_scores.push_back(score);
-                    std::sort(top_scores.begin(), top_scores.end());
-                }
-                else if (score > top_scores[0] && top_scores.size() == 10) {
-                    top_scores[0] = score;
-                    std::sort(top_scores.begin(), top_scores.end());
-                } else {
-                    continue;
-                }
 
-                
                 scoreboard_line.append(file_name.substr(0, score_sep));
                 scoreboard_line.push_back(' ');
                 // find the string from score_sep to the next underscore
@@ -699,7 +684,10 @@ std::string create_scoreboard() {
                 scoreboard_line.push_back('\n');
 
                 file.close();
-                scoreboard.push_back(scoreboard_line);
+                // if the line alraedy exists in the vector, don't add it
+                if (std::find(scoreboard.begin(), scoreboard.end(), scoreboard_line) == scoreboard.end()) {
+                    scoreboard.push_back(scoreboard_line);
+                }
                 scoreboard_line.clear();
             }
         }
@@ -712,7 +700,6 @@ std::string create_scoreboard() {
 
     // sort the vector scoreboard based on the score which is the first number in the string in descending order
     std::sort(scoreboard.begin(), scoreboard.end(), [](std::string a, std::string b) {
-        std::cerr << "a = " << a << "b = " << b << std::endl;
         auto score_a = stoi(a.substr(0, a.find(' ')));
         auto score_b = stoi(b.substr(0, b.find(' ')));
         return score_a > score_b;
@@ -722,8 +709,13 @@ std::string create_scoreboard() {
 
     // convert scoreboard to a string
     std::string scoreboard_string = "";
+    int i = 0;
     for (auto line : scoreboard) {
+        if (i == 11) {
+            break;
+        }
         scoreboard_string.append(line);
+        i++;
     }
 
 
