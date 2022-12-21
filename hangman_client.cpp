@@ -246,10 +246,10 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     response.pop_back();
     // TODO fix input splitting    
     std::string response_command = response.substr(0 , response.find(' '));
-    if (response_command == ERR) {
-        std::cout << "The command is wrong.\n";
-        return;
-    }
+    // // if (response_command == ERR) {
+    // //     std::cout << "The command is wrong.\n";
+    // //     return;
+    // // }
     
     // TODO fix input splitting
     std::string status = get_status(response);
