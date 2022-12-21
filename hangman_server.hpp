@@ -34,6 +34,7 @@
 #define GAMES_DIR "GAMES/"
 #define COPY "cp "
 #define MOVE "mv "
+#define REMOVE_FORCE "rm -rf "
 #define ACTIVE_GAME_PATH "GAMES/GAME_"
 #define SCORES "SCORES/"
 #define PICTURES "PICTURES/"

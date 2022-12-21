@@ -975,7 +975,7 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
             send_message(fd, get_last_reply(req).c_str(), get_last_reply(req).length(), addr, addrlen);
             return;
         }
-
+        printf("MATEUS MATEUS MATEUS MATEUS MATEUS MATEUS MATEUS\n");
         status = OK;
         std::string line = get_random_line_from_file();
         std::string word = get_word(line);
@@ -1774,6 +1774,7 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     new_game->move_number = "1";
     new_game->hint_file = hint;
     new_game->last_request = req->full_request;
+    new_game->last_reply = "NULL";
     
     for (auto it = new_game->word.begin(); it != new_game->word.end(); it++) {
         new_game->word_knowledge.push_back('_');
@@ -2035,6 +2036,10 @@ void create_directories() {
     std::string games = GAMES_DIR;
     if (is_directory(GAMES_DIR) == -1) {
         mkdir(GAMES_DIR, 0777);
+    }
+    else {
+        std::string command = REMOVE_FORCE + games + "*";
+        system(command.c_str());
     }
     if (is_directory(SCORES) == -1) {
         mkdir(SCORES, 0777);
