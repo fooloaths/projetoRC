@@ -9,9 +9,8 @@ play d
 guess bracadabra
 play g
 guess abracadabraa
-play e
-play f
-play g
-play h
+play i
+play j
+play k
 play r
 exit
