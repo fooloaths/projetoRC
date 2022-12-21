@@ -44,7 +44,7 @@ Mateus Pinho - ist199282
 
 #define NUMBER_THREADS 16
 #define BLOCK_SIZE 256
-#define PORT "58011"
+#define PORT "58046"
 #define GAME_NAME 15
 #define SEED 73
 #define NUMBER_OF_WORDS 26       // TODO algumas destas constantes foram tiradas do rabo
