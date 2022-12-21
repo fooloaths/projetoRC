@@ -663,7 +663,6 @@ void status(const char* server_ip, const char* server_port) {
 }
 
 void status_aux_ok(std::string status) {
-    // TODO remove specific number of spaces handler
 
     // split the string into two strings after the first tab
 
@@ -672,12 +671,10 @@ void status_aux_ok(std::string status) {
     auto third_space = status.find(' ', second_space) + 1;
     auto length = third_space - second_space;
     auto file_name = status.substr(second_space, length);
-
-    status = status.substr(status.find("     ") + 1, status.length());
-    // remove all occurrences of "     " in the string
-    while (status.find("     ") != std::string::npos) {
-        status.erase(status.find("     "), 5);
-    }
+    
+    // status is after the fourth space
+    auto fourth_space = status.find(' ', third_space) + 1;
+    status = status.substr(fourth_space, status.length());
 
     std::cout << "Status was saved to " << file_name << "with " << length << " bytes.\n";
     std::cout << status;

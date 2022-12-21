@@ -2034,7 +2034,6 @@ void tcp_write(int fd, std::string message) {
 
     printf("tcp_write: We want to send message = %s", ptr);
     while (bytes > 0) {
-        printf("\nyo\n");
         n = write(fd, ptr, message.length());
         if (n <= 0) {
             printf("Error (tcp_write): Something went wrong writing to the file descriptor\n");
