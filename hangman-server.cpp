@@ -765,6 +765,7 @@ void treat_state(struct request *req, int fd) {
             message = message + " " + status + "\n";
             tcp_write(fd, message);
         }
+        found = -1;
     }
     else {
         // printf("treat_state: A game was found!!!\n");
@@ -903,15 +904,15 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
         n = n + fwrite(line_it.c_str(), sizeof(char), line_it.length(), file);
     }
 
-    /* Write WIN/QUIT/ETC (if not an active game) */
-    if (game_found == -1) {
-        line = TERMINATION + file_name[15]; // index 15 of a finished game is always the termination code
-        line.push_back('\n');
-    }
-    else {
-        // line = CURRENTLY_SOLVED + get_word_knowledge(req) + "\n";
-        // printf("Write_to_temp_file: Writing current knowledge of word\n", line.c_str());
-    }
+    // /* Write WIN/QUIT/ETC (if not an active game) */
+    // if (game_found == -1) {
+    //     line = TERMINATION + file_name[15]; // index 15 of a finished game is always the termination code
+    //     line.push_back('\n');
+    // }
+    // else {
+    //     line = CURRENTLY_SOLVED + get_word_knowledge(req) + "\n";
+    //     printf("Write_to_temp_file: Writing current knowledge of word\n%s", line.c_str());
+    // }
     // n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
 
     return n;
