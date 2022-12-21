@@ -657,7 +657,8 @@ void status(const char* server_ip, const char* server_port) {
         std::cout << "No games found.\n";
     } else {
         status_aux_ok(response);
-        exit(1);
+        // ! SUS
+        // // exit(1);
     }
 }
 
