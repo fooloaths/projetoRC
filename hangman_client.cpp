@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
 
         // poll for timeout UDP (must review) 
         struct timeval tv;
-        tv.tv_sec = 5;
+        tv.tv_sec = 45;
         tv.tv_usec = 0;
         if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
             std::cout << "Error " << strerror(errno) << std::endl;
@@ -246,10 +246,10 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     response.pop_back();
     // TODO fix input splitting    
     std::string response_command = response.substr(0 , response.find(' '));
-    if (response_command == ERR) {
-        std::cout << "The command is wrong.\n";
-        return;
-    }
+    // // if (response_command == ERR) {
+    // //     std::cout << "The command is wrong.\n";
+    // //     return;
+    // // }
     
     // TODO fix input splitting
     std::string status = get_status(response);
@@ -504,7 +504,7 @@ void hint_aux_ok(std::string status) {
     auto third_space = status.find(' ', second_space) + 1;
     auto fourth_space = status.find(' ', third_space) + 1;
     auto length = third_space - second_space;
-    auto file_name = status.substr(second_space, length);
+    auto file_name = status.substr(second_space, length - 1);
 
     // everything after the fourth space is the useful info
     auto useful_info = status.substr(fourth_space);
@@ -522,7 +522,7 @@ void hint_aux_ok(std::string status) {
     auto file_size = file2.tellg();
     file2.close();
 
-    std::cout << "The hint is in the file " << file_name << "and it is " << file_size << " bytes\n";
+    std::cout << "The hint is in the file " << file_name << " and it is " << file_size << " bytes\n";
 }
 
 void hint(const char *server_ip, const char *server_port) {
@@ -576,7 +576,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     }
 
     struct timeval tv;
-    tv.tv_sec = 5;
+    tv.tv_sec = 45;
     tv.tv_usec = 0;
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
         std::cout << "Error " << strerror(errno) << std::endl;
@@ -647,6 +647,8 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     
     freeaddrinfo(res);
     close(fd);
+
+    std::cerr << "Response: " << buffer.str() << std::endl;
 
     return buffer.str();
 }

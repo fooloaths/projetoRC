@@ -382,6 +382,7 @@ struct request* process_input(char buffer[]) {
     printf("\nprocess_input: Starting function\n");
 
     printf("process_input: Allocating memory for request structure\n");
+    printf("process_input: O request foi = %s", buffer);
     struct request *req = (struct request *) malloc(sizeof(struct request));
     
     /* Check if memory for the request was correctly allocated */
@@ -419,6 +420,7 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
+    printf("process_input: O OP_CODE = %s\n", req->op_code.c_str());
     if (req->op_code == GSB) {
         /* Nothing more to parse */
         req->letter_word = "NULL"; req->trial = "NULL"; req->PLID = "NULL";
@@ -440,6 +442,7 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
+    printf("process_input: PLID = %s\n", req->PLID.c_str());
     i++;
 
     if (valid_PLID(req->PLID) == -1) {
@@ -975,7 +978,7 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
             send_message(fd, get_last_reply(req).c_str(), get_last_reply(req).length(), addr, addrlen);
             return;
         }
-
+        printf("MATEUS MATEUS MATEUS MATEUS MATEUS MATEUS MATEUS\n");
         status = OK;
         std::string line = get_random_line_from_file();
         std::string word = get_word(line);
@@ -1774,6 +1777,7 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     new_game->move_number = "1";
     new_game->hint_file = hint;
     new_game->last_request = req->full_request;
+    new_game->last_reply = "NULL";
     
     for (auto it = new_game->word.begin(); it != new_game->word.end(); it++) {
         new_game->word_knowledge.push_back('_');
@@ -1943,7 +1947,7 @@ int file_exists(std::string name) {
 void treat_hint(struct request *req, int fd) {
     std::string message = RHL;
     message.push_back(' ');
-    // printf("treat_hint: Starting function. The message is currently\n%s\n", message.c_str());
+    printf("treat_hint: Starting function. The message is currently\n%s\n", message.c_str());
 
     /* Look for active games with req->PLID */
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
@@ -1959,47 +1963,63 @@ void treat_hint(struct request *req, int fd) {
         return;
     }
     message = message + OK + " ";
-    // printf("treat_hint: Game found. The message is currently\n%s\n", message.c_str());
+    printf("treat_hint: Game found. The message is currently\n%s\n", message.c_str());
 
     /* Get name of hint file */
     std::string game_path = ACTIVE_GAME_PATH + req->PLID + TXT;
     // std::string line = get_word_and_hint(game_path);
     char *line = get_word_and_hint(game_path);
     std::string hint = get_hint(line);
-    // printf("treat_hint: The hint is\n%s\n", hint.c_str());
+    printf("treat_hint: The hint is\n%s\n", hint.c_str());
 
     message = message + hint + " ";
-    // printf("treat_hint: The message is now\n%s\n", message.c_str());
+    printf("treat_hint: The message is now\n%s\n", message.c_str());
 
     /* Open hint file */
     std::string hint_path = PICTURES + hint;
-    // printf("treat_hint: Opening file (read binary) with path\n%s\n", hint_path.c_str());
+    printf("treat_hint: Opening file (read binary) with path\n%s\n", hint_path.c_str());
     FILE *file = fopen(hint_path.c_str(), "rb");
 
     /* Get file size */
     fseek(file, 0, SEEK_END); // Place offset at the end of file
     ssize_t size = ftell(file); // Get offset value
     fseek(file, 0, SEEK_SET); // Set offset back to the start of file
-    // printf("treat_hint: File size is %ld bytes\n", size);
+    printf("treat_hint: File size is %ld bytes\n", size);
 
     message = message + std::to_string(size) + " ";
-    // printf("treat_hint: The message is now\n%s\n", message.c_str());
-    fclose(file);
+    printf("treat_hint: The message is now\n%s\n", message.c_str());
+    // fclose(file);
     
     /* Read file content */
-    std::ifstream hint_file(hint_path);
-    std::string content;
-
-
-    while (getline (hint_file, content)) {
-        content.push_back('\n');
+    // std::ifstream hint_file(hint_path);
+    std::string content(READ_SIZE, '\0');
+    size_t bytes_read = 0;
+    size_t i = 0;
+    while (size > READ_SIZE) {
+        printf("Iteração %ld\n", i);
+        bytes_read = fread(&content.front(), sizeof(char), READ_SIZE, file); // read READ_SIZE bytes to our buffer
         message = message + content;
+        size = size - bytes_read;
+        i++;
     }
-    hint_file.close();
+    printf("Sobraram size = %ld", size);
+    if (size > 0) {
+        std::string last_content(size, '\0');
+        fread(&last_content.front(), sizeof(char), size, file);
+        message = message + last_content;
+    }
 
+    // printf("treat_hint: Reading file's content\n");
+    // while (getline (hint_file, content)) {
+    //     printf("Iteração Iteração");
+    //     content.push_back('\n');
+    //     message = message + content;
+    // }
+    // hint_file.close();
+    fclose(file);
 
     message = message + "\n";
-    // printf("treat_hint: Message being sent is\n%s", message.c_str());
+    printf("treat_hint: Message being sent is\n%s", message.c_str());
     /* Send reply */
     tcp_write(fd, message);
     // ssize_t n = write(fd, message.c_str(), message.length());
@@ -2036,6 +2056,10 @@ void create_directories() {
     if (is_directory(GAMES_DIR) == -1) {
         mkdir(GAMES_DIR, 0777);
     }
+    else {
+        std::string command = REMOVE_FORCE + games + "*";
+        system(command.c_str());
+    }
     if (is_directory(SCORES) == -1) {
         mkdir(SCORES, 0777);
     }
@@ -2058,6 +2082,7 @@ void tcp_write(int fd, std::string message) {
         }
         bytes = bytes - n;
         ptr = ptr + n;
+        printf("tcp_write: This time wrote %ld bytes and we still need to write %ld bytes\n", n, bytes);
     }
 }
 

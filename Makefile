@@ -5,7 +5,7 @@ hangman_client.out: hangman_server.cpp
 	$(CXX) $(CXXFLAGS) -o hangman_client.out hangman_client.cpp
 
 hangman_server.cpp:
-	$(CXX) $(CXXFLAGS) -o GS.out hangman-server.cpp
+	$(CXX) $(CXXFLAGS) -o GS hangman-server.cpp
 	
 clean:
 	rm *.out
