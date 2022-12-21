@@ -1,0 +1,8 @@
+roentgenography x-ray.jpg
+T g
+T d
+T r
+T y
+T z
+G roentgenography
+2
