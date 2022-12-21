@@ -1,0 +1,8 @@
+electroencephalographical EEG.png
+T a
+T e
+T g
+T y
+T z
+G electroencephalographical
+2

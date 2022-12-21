@@ -1,0 +1,8 @@
+quadraphonic surround.png
+T c
+T d
+T q
+T y
+T z
+G quadraphonic
+2

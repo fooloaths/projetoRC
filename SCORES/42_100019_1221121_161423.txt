@@ -1,0 +1,8 @@
+stratocruiser northwest_ad.jpg
+T t
+T d
+T r
+T y
+T u
+G stratocruiser
+2

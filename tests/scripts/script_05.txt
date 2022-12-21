@@ -1,0 +1,16 @@
+start 100001
+play a
+play b
+play c
+play d
+play e
+play f
+play g
+play h
+play i
+play j
+play k
+play l
+play m
+play r
+exit

@@ -1,0 +1,16 @@
+start 100001
+play a
+play e
+play b
+guess abracadabr
+play c
+play f
+play d
+guess bracadabra
+play g
+guess abracadabraa
+play i
+play j
+play k
+play r
+exit
