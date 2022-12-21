@@ -1669,6 +1669,7 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
         increment_game_success(req);
         if (won_game(req)) {
             /* Won the game */
+            increment_game_trials(req);
             message = message + WIN + "\n";
             move_to_SCORES(req, W);
 
