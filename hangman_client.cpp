@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
 
         // poll for timeout UDP (must review) 
         struct timeval tv;
-        tv.tv_sec = 5;
+        tv.tv_sec = 45;
         tv.tv_usec = 0;
         if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
             std::cout << "Error " << strerror(errno) << std::endl;
@@ -576,7 +576,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     }
 
     struct timeval tv;
-    tv.tv_sec = 5;
+    tv.tv_sec = 45;
     tv.tv_usec = 0;
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
         std::cout << "Error " << strerror(errno) << std::endl;

@@ -30,6 +30,7 @@
 #define G "G"
 #define LINE_SIZE 32
 #define FINISHEd_GAME_PATH_SIZE 36
+#define READ_SIZE 4096
 
 #define GAMES_DIR "GAMES/"
 #define COPY "cp "

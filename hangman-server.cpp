@@ -1988,19 +1988,33 @@ void treat_hint(struct request *req, int fd) {
 
     message = message + std::to_string(size) + " ";
     printf("treat_hint: The message is now\n%s\n", message.c_str());
-    fclose(file);
+    // fclose(file);
     
     /* Read file content */
-    std::ifstream hint_file(hint_path);
-    std::string content;
-
-
-    while (getline (hint_file, content)) {
-        content.push_back('\n');
+    // std::ifstream hint_file(hint_path);
+    std::string content(READ_SIZE, '\0');
+    size_t bytes_read = 0;
+    size_t i = 0;
+    while (size > READ_SIZE) {
+        printf("Iteração %ld\n", i);
+        bytes_read = fread(&content.front(), sizeof(char), READ_SIZE, file); // read READ_SIZE bytes to our buffer
         message = message + content;
+        size = size - bytes_read;
+        i++;
     }
-    hint_file.close();
+    if (size > 0) {
+        std::string last_content(size, '\0');
+        fread(&last_content.front(), sizeof(char), size, file);
+    }
 
+    // printf("treat_hint: Reading file's content\n");
+    // while (getline (hint_file, content)) {
+    //     printf("Iteração Iteração");
+    //     content.push_back('\n');
+    //     message = message + content;
+    // }
+    // hint_file.close();
+    fclose(file);
 
     message = message + "\n";
     printf("treat_hint: Message being sent is\n%s", message.c_str());
