@@ -44,7 +44,7 @@ Mateus Pinho - ist199282
 
 #define NUMBER_THREADS 16
 #define BLOCK_SIZE 256
-#define PORT "58011"
+#define PORT "58046"
 #define GAME_NAME 15
 #define SEED 73
 #define NUMBER_OF_WORDS 26       // TODO algumas destas constantes foram tiradas do rabo
@@ -632,19 +632,19 @@ std::string create_scoreboard() {
     // iterate through all the files in the SCORES folder, and store the file_name in a vector
 
     std::cerr << "create_scoreboard: Starting function\n";
-
-    std::string scoreboard = "TOP 10 SCORES:\n";
-    DIR *dir;
-    struct dirent *ent;
-
+    std::vector<std::string> scoreboard;
     // keep a vector of the ten highest scores
     std::vector<int> top_scores;
+
+    DIR *dir;
+    struct dirent *ent;
 
     if ((dir = opendir ("SCORES")) != NULL) {
         while ((ent = readdir (dir)) != NULL) {
             if (ent->d_name[0] != '.') {
                 std::string file_name = ent->d_name;
                 auto score_sep = file_name.find('_');
+                std::string scoreboard_line = "";
 
                 auto score = stoi(file_name.substr(0, score_sep));
                 // if the score is higher than the lowest score in the top_scores vector and there are less than 10 scores, add it to the vector
@@ -660,34 +660,43 @@ std::string create_scoreboard() {
                 }
 
                 
-                scoreboard.append(file_name.substr(0, score_sep));
-                scoreboard.push_back(' ');
+                scoreboard_line.append(file_name.substr(0, score_sep));
+                scoreboard_line.push_back(' ');
                 // find the string from score_sep to the next underscore
                 auto pl_id = file_name.substr(score_sep + 1, file_name.find('_', score_sep + 1) - score_sep - 1);
-                scoreboard.append(pl_id);
+                scoreboard_line.append(pl_id);
 
                 // open the file and store the first line into a string named word
                 std::ifstream file("SCORES/" + file_name);
                 std::string word;
                 std::getline(file, word);   
                 word = word.substr(0, word.find(' '));
-                scoreboard.push_back(' ');
-                scoreboard.append(word);
-                scoreboard.push_back(' ');
+                scoreboard_line.push_back(' ');
+                scoreboard_line.append(word);
+                scoreboard_line.push_back(' ');
 
                 // the nubmer of lines in the file is the number of guesses
                 int guesses = 0;
-                int good_guesses = 0;
+                int bad_guesses = 0;
                 while (std::getline(file, word)) {
                     guesses++;
-                }
-                scoreboard.append("Good guesses: " + std::to_string(good_guesses));
-                scoreboard.push_back(' ');
-                scoreboard.append("Total trials: " + std::to_string(guesses));
-                scoreboard.push_back('\n');
+
+                    // bad guess is the contents of the last line of the file
+                    if (file.peek() == std::ifstream::traits_type::eof()) {
+                        bad_guesses = stoi(word);
+                    }
+                }   
+            
+                auto good_guesses = guesses - bad_guesses;
+
+                scoreboard_line.append("Good guesses: " + std::to_string(good_guesses));
+                scoreboard_line.push_back(' ');
+                scoreboard_line.append("Total trials: " + std::to_string(guesses));
+                scoreboard_line.push_back('\n');
 
                 file.close();
-
+                scoreboard.push_back(scoreboard_line);
+                scoreboard_line.clear();
             }
         }
         closedir (dir);
@@ -697,12 +706,30 @@ std::string create_scoreboard() {
         return "";
     }
 
-    if (scoreboard == "TOP 10 SCORES:\n") {
-        return "EMPTY";
+    // sort the vector scoreboard based on the score which is the first number in the string in descending order
+    std::sort(scoreboard.begin(), scoreboard.end(), [](std::string a, std::string b) {
+        std::cerr << "a = " << a << "b = " << b << std::endl;
+        auto score_a = stoi(a.substr(0, a.find(' ')));
+        auto score_b = stoi(b.substr(0, b.find(' ')));
+        return score_a > score_b;
+    });
+
+    scoreboard.insert(scoreboard.begin(), "TOP 10 SCORES:\n");
+
+    // convert scoreboard to a string
+    std::string scoreboard_string = "";
+    for (auto line : scoreboard) {
+        scoreboard_string.append(line);
     }
 
-    std::cout << "create_scoreboard: scoreboard = " << scoreboard << std::endl;
-    return scoreboard;
+
+    if (scoreboard_string == "TOP 10 SCORES:\n") {
+        return "EMPTY";
+    }
+    
+
+    std::cout << "create_scoreboard: scoreboard = " << scoreboard_string << std::endl;
+    return scoreboard_string;
     
 }
 
