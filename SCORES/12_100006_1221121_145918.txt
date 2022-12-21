@@ -1,0 +1,9 @@
+ferromagnetism magnet.jpg
+G abcdefgh
+G abcdefghi
+G abcdefghij
+G abcdefghijk
+G abcdefghijkl
+G abcdefghijklmnopqrstuvwxyzabcd
+G ferromagnetism
+6
