@@ -2002,9 +2002,11 @@ void treat_hint(struct request *req, int fd) {
         size = size - bytes_read;
         i++;
     }
+    printf("Sobraram size = %ld", size);
     if (size > 0) {
         std::string last_content(size, '\0');
         fread(&last_content.front(), sizeof(char), size, file);
+        message = message + last_content;
     }
 
     // printf("treat_hint: Reading file's content\n");
