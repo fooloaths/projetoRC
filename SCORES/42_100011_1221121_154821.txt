@@ -1,0 +1,8 @@
+knowledge Great-horned-owl.jpg
+T k
+T b
+T n
+T z
+T g
+G knowledge
+2

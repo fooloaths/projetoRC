@@ -1,0 +1,11 @@
+chlorobenzylidenemalononitrile 2D-struct.png
+G abcd
+G abcdef
+G abcdefgh
+G abcdefghi
+G abcdefghij
+G abcdefghijk
+G abcdefghijkl
+G abcdefghijklmnopqrstuvwxyzabcd
+G chlorobenzylidenemalononitrile
+8

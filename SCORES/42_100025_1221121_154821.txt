@@ -1,0 +1,8 @@
+yellowstone falls.jpg
+T c
+T s
+T x
+T y
+T w
+G yellowstone
+2
