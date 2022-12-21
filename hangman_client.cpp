@@ -648,6 +648,8 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     freeaddrinfo(res);
     close(fd);
 
+    std::cerr << "Response: " << buffer.str() << std::endl;
+
     return buffer.str();
 }
 
