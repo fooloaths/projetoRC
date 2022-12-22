@@ -9,3 +9,5 @@ Doravante, para correr os comandos basta guiar-se pelo enunciado, visto que a si
 Para alterar os timeouts, no caso do cliente, basta alterar SOCKET_TIMEOUT no início do seu código.
 No servidor, a constante SOCKET_TIMEOUT está definida no *header* file acompanhante.
 Para remover por completo os timeouts, recomendamos que os coloquem num valor arbitrariamente alto, p. ex, SIZE_MAX.
+
+Para o servidor funcionar corretamente, as imagens devem ser colocadas dentro da pasta PICTURES/, caso contrário, o comportamento não será o esperado.
