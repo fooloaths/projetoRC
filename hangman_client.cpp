@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in addr;
 
     // ! Uncomment this to disable stderr output
-    // // std::cerr.rdbuf(nullptr);
+    std::cerr.rdbuf(nullptr);
 
     // check if the number of arguments is correct
     auto ip_port_tuple = parse_args(argc, argv);
@@ -517,14 +517,22 @@ void scoreboard_aux_ok(std::string scoreboard) {
     std::string file_name = scoreboard.substr(0, scoreboard.find(' '));
     // file_size is between the first space and the first space
     auto useful_info = scoreboard.substr(scoreboard.find(' ') + 1, scoreboard.length());
+
     // remove newline from file
     useful_info = useful_info.substr(useful_info.find(' ') + 1, useful_info.length()); 
-    std::cout << useful_info;
-    
+
     // create new file named file_name with file_size bytes and write useful_info into it
     std::ofstream file(file_name);
     file << useful_info;
     file.close();
+
+    // store the file_size of file_name into length
+    std::ifstream file2(file_name, std::ios::binary | std::ios::ate);
+    auto file_size = file2.tellg();
+    file2.close();
+
+    std::cout << "Scoreboard was saved to " << file_name << " with " << file_size << " bytes.\n";
+    std::cout << useful_info;
 }
 
 void scoreboard(const char* server_ip, const char* server_port) {
