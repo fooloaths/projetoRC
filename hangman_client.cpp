@@ -29,7 +29,7 @@ Mateus Pinho - ist199282
 #include <fstream>
 
 /* Definitions */
-#define SOCKET_TIMEOUT 20 // seconds
+#define SOCKET_TIMEOUT 60 // seconds
 
 /* Global variables */
 int move_number = 0;
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
 
-    // ! Uncomment this to disable stderr output
+    // ! Comment out this to disable stderr output
     std::cerr.rdbuf(nullptr);
 
     // check if the number of arguments is correct
