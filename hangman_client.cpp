@@ -25,6 +25,7 @@ Mateus Pinho - ist199282
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <tuple>
 #include <fstream>
 
 /* Global variables */
@@ -52,34 +53,80 @@ void hint(const char* server_ip, const char* server_port);
 void status_aux_ok(std::string message);
 void hint_aux_ok(std::string message);
 std::string tcp_helper(std::string message, const char* server_ip, const char* server_port);
+std::tuple<char*, char*> parse_args(int argc, char *argv[]);
+
+std::tuple<char*, char*> parse_args(int argc, char *argv[]) {
+    char *server_ip, *server_port;
+
+    /* Parse arguments in the following way
+    First, if there are no arguments, use the default values
+    Second, if there is only one argument, it can be either the server ip or the server port
+    Server ip is preceded by -n and server port is preceded by -p
+    Third, if there are two arguments, the order is irrelevant
+    If there are more than two arguments, print an error message and exit
+    */
+
+    if (argc == 1) {
+        std::cerr << "argc == 1" << std::endl;
+        server_ip = (char*)GSIP;
+        server_port = (char*)GSPORT;
+    } else if (argc == 3) {
+        std::cerr << "argc == 3" << std::endl;
+        if (strcmp(argv[1], "-n") == 0) {
+            server_ip = (char*)argv[2];
+            server_port = (char*)GSPORT;
+        } else if (strcmp(argv[1], "-p") == 0) {
+            server_ip = (char*)GSIP;
+            server_port = (char*)argv[2];
+        } else {
+            std::cout << "Error: Invalid arguments.\n";
+            exit(1);
+        }
+    } else if (argc == 5) {
+        std::cerr << "argc == 5" << std::endl;
+        if (strcmp(argv[1], "-n") == 0) {
+            if (strcmp(argv[3], "-p") == 0) {
+                server_ip = (char*)argv[2];
+                server_port = (char*)argv[4];
+            } else {
+                std::cout << "Error: Invalid arguments.\n";
+                exit(1);
+            }
+        } else if (strcmp(argv[1], "-p") == 0) {
+            if (strcmp(argv[3], "-n") == 0) {
+                server_ip = (char*)argv[4];
+                server_port = (char*)argv[2];
+            } else {
+                std::cout << "Error: Invalid arguments.\n";
+                exit(1);
+            }
+        } else {
+            std::cout << "Error: Invalid arguments.\n";
+            exit(1);
+        }
+    } else {
+        std::cout << "Error: Invalid arguments.\n";
+        exit(1);
+    }
+
+    return std::make_tuple(server_ip, server_port);
+}
 
 int main(int argc, char *argv[]) {
     int fd, errorcode;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
-    char *server_ip, *server_port;
+
+    std::ofstream file("/dev/null");
+    std::cerr.rdbuf(file.rdbuf());
 
     // check if the number of arguments is correct
-    if (argc == 1) {
-        server_ip = (char*)GSIP;
-        server_port = (char*)GSPORT;
-    } else if (argc > 5) {
-        std::cout << "Usage: ./hangman_client -p server_ip -n server_port" << std::endl;
-        exit(1);
-    } else if (argc > 1 && argc < 5){ 
-        std::cout << "Please specify nothing or both the PORT and the IP" << std::endl;
-        exit(1);
-    } else {
-        server_ip = argv[2];
-        if (strcmp(server_ip, "") == 0) {
-            server_ip = (char*)GSIP;
-        }
+    auto ip_port_tuple = parse_args(argc, argv);
+    char* server_ip = std::get<0>(ip_port_tuple);
+    char* server_port = std::get<1>(ip_port_tuple);
 
-        server_port = argv[4];
-        if (strcmp(server_port, "") == 0) {
-            server_port = (char*)GSPORT;
-        }   
-    }
+    std::cerr << "Server IP: " << server_ip << std::endl;
+    std::cerr << "Server Port: " << server_port << std::endl;
 
     // create a socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);

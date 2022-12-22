@@ -8,14 +8,14 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 run_server () {
-  ./GS.out word_eng.txt > tests/tmp/server.log
+  ./GS word_eng.txt > tests/tmp/server.log
 }
 
 run_command() {
     echo "Testing $1"
     FILE_NAME=$(basename $1 .txt)
     TEST=$(echo $FILE_NAME | cut -d'_' -f2)
-    COMMAND=$(echo "192.168.1.3 58046 $TEST" | $TEJO > tests/tmp/report-$TEST.html)
+    COMMAND=$(echo "$MY_IP 58046 $TEST" | $TEJO > tests/tmp/report-$TEST.html)
     if [ ! -s tests/tmp/report-$TEST.html ] || grep -q "color=\"red\"" tests/tmp/report-$TEST.html; then
         echo -e "${RED}Test failed${NC}"
     else
@@ -26,7 +26,7 @@ run_command() {
 handle_test() {
     run_server &
     run_command $1
-    killall GS.out
+    killall GS
     sleep 3 # to avoid being timed out ;-;
 }
 
