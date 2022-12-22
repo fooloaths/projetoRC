@@ -48,7 +48,8 @@
 #define TERMINATION "Termination: "
 #define WORD_GUESS "Word guess: "
 #define CURRENTLY_SOLVED "Solved so far: "
-#define APAGAR_DEPOIS "12_"
+#define VERBOSE "-v"
+#define PORT_FLAG "-p"
 
 #define FALSE 0
 #define TRUE 1
