@@ -147,18 +147,6 @@ int main(int argc, char **argv) {
     char buffer[BLOCK_SIZE];
     memset(buffer, '\0', BLOCK_SIZE);
 
-    // if (argc < 2) {
-    //     printf("Input Error (main): Expected, at least, 1 argument (word_file), but none was given.\n");
-    //     printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
-    //     return 1;
-    // }
-    // if (argc > 2) {
-    //     std::string arg_1 = argv[2];
-    //     std::string arg_2 = argv[3];
-    //     if (arg_1 == ARG_PORT) {
-    //         port = arg_2;
-    //     }
-    // }
     parse_bootup_arguments(argc, argv);
 
     word_file = argv[1];
