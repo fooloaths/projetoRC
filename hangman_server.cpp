@@ -104,6 +104,8 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
 void treat_scoreboard(struct request *req, int fd);
 std::string create_scoreboard_file();
 void tcp_write(int fd, std::string message);
+void verbose_print(struct sockaddr_in addr, struct request *req);
+void parse_bootup_arguments(int argc, char **argv);
 
 struct request {
     std::string op_code;
@@ -132,6 +134,8 @@ struct game {
 std::unordered_map<std::string, struct game*> active_games;
 std::string word_file = "word_eng.txt";
 std::string port = PORT;
+int verbose = 0;
+int port_flag = 0;
 int file_line = 0;
 FILE* fp_word_file;
 
@@ -146,18 +150,19 @@ int main(int argc, char **argv) {
     char buffer[BLOCK_SIZE];
     memset(buffer, '\0', BLOCK_SIZE);
 
-    if (argc < 2) {
-        printf("Input Error (main): Expected, at least, 1 argument (word_file), but none was given.\n");
-        printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
-        return 1;
-    }
-    if (argc > 2) {
-        std::string arg_1 = argv[2];
-        std::string arg_2 = argv[3];
-        if (arg_1 == ARG_PORT) {
-            port = arg_2;
-        }
-    }
+    // if (argc < 2) {
+    //     printf("Input Error (main): Expected, at least, 1 argument (word_file), but none was given.\n");
+    //     printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
+    //     return 1;
+    // }
+    // if (argc > 2) {
+    //     std::string arg_1 = argv[2];
+    //     std::string arg_2 = argv[3];
+    //     if (arg_1 == ARG_PORT) {
+    //         port = arg_2;
+    //     }
+    // }
+    parse_bootup_arguments(argc, argv);
 
     word_file = argv[1];
 
@@ -328,6 +333,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
             }
 
             /* Treat request */
+            verbose_print(addr, req);
             treat_tcp_request(newfd, req);
             free(req);
             close(newfd);
@@ -567,7 +573,7 @@ std::string get_random_line_from_file() {
     Checks the op_code associated with the request and calls the sub-routine
     that implements that functionality */
 int treat_request(int fd, struct sockaddr_in addr, socklen_t addrlen, struct request *req) {
-
+    verbose_print(addr, req);
     if (req->error == TRUE) {
         /* Something in the given request is invalid */
         report_error(fd, addr, addrlen, req);
@@ -2020,4 +2026,81 @@ std::string get_last_request(struct request *req) {
     struct game *g = it->second;
 
     return g->last_request;
+}
+
+
+void verbose_print(struct sockaddr_in addr, struct request *req) {
+    if (verbose) {
+        printf("From the IP address %s and port %d, a client with id %s sent the following request %s\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port), req->PLID.c_str(), req->full_request.c_str());
+    }
+}
+
+/* Parse bootup arguments 
+
+    Parses the command line arguments to make sure the process was invoked as:
+    ./executable <word_file> [-p GSport] [-v]
+    
+    If any of the flags were passed, the respective global variables are updated */
+void parse_bootup_arguments(int argc, char **argv) {
+
+    std::string argument;
+    if (argc == 2) {
+        /* Only one argument was provided */
+        argument = argv[1];
+        if (argument == VERBOSE || argument == PORT_FLAG) {
+            printf("Input Error: Only argument provided was a flag, but a .txt file was expected\n");
+            printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
+            exit(1);
+        }
+        return;
+    }
+    else if (argc < 2) {
+        printf("Input Error: Expected, at least, 1 argument (word_file), but none was given.\n");
+        printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
+        exit(1);
+    }
+    else if (argc > 5) {
+        printf("Input Error: Expected, at most, 5 arguments, but more were given.\n");
+        printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
+        exit(1);  
+    }
+
+    argument = argv[1];
+    if (argument == VERBOSE || argument == PORT_FLAG) {
+        printf("Input Error: First argument provided was a flag, but a .txt file was expected\n");
+        printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
+        exit(1);
+    }
+
+    for (int i = 2; i < argc; i++) {
+        argument = argv[i];
+        if (argument == VERBOSE) {
+            verbose++;
+        }
+        else if (argument == PORT_FLAG) {
+            port_flag++;
+        }
+        else {
+            if (port_flag != 1) {
+                printf("Input Error: Something went wrong. These are the most likely possibilities:\n");
+                printf("    1) More than one port flag or one port were passed\n");
+                printf("    2) An unexpected argument was passed\n");
+                printf("    3) What was supposed to be a port was passed before a port flag\n");
+                exit(1);
+            }
+            port = argument;
+            port_flag--;
+        }
+
+    }
+    if (verbose > 1) {
+        printf("Input Error: Verbose flag was passed more than once.\n");
+        exit(1);
+    }
+    if (port_flag != 0 && port_flag != -1) {
+        /* port_flag = 0 --> No port (and no port flag) were passed 
+           port_flag = -1 --> A port flag and a port were passed */
+        printf("Input Error: Port flag was passed, at least once, but a port wasn't specified\n");
+        exit(1);
+    }
 }
