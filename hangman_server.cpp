@@ -104,7 +104,6 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
 void treat_scoreboard(struct request *req, int fd);
 std::string create_scoreboard_file();
 void tcp_write(int fd, std::string message);
-// // int FindTopScores(SCORELIST ∗list);
 
 struct request {
     std::string op_code;
@@ -222,7 +221,6 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     hints.ai_socktype = SOCK_DGRAM; // UDP socket
     hints.ai_flags = AI_PASSIVE;
 
-    printf("olá\n");
     errorcode = getaddrinfo(NULL, port.c_str(), &hints, &res);
     if (errorcode != 0) {
         printf("Error (udp_server): An error occured while getting an addrinfo structure\n");
@@ -239,18 +237,16 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
     while (1) {
         /* Read requests from UDP socket */
         addrlen = sizeof(addr);
-        printf("reeeading\n");
         n = recvfrom(fd,buffer, BLOCK_SIZE,0, (struct sockaddr*) &addr, &addrlen);
         if (n == -1) {
             printf("Error (udp_server): An error occured while trying to receive a message from the UDP socket\n");
             exit(1);
         }
 
-        printf("aaaaaaaaa\n");
-        printf("buffer = %s", buffer);
         struct request *req = process_input(buffer);
         if (req == NULL) {
             printf("Error (udp_server): Couldn't allocate memory to process request\n");
+            exit(1);
         }
         treat_request(fd, addr, addrlen, req);
         free(req);
@@ -310,6 +306,7 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         /* Fork a new process to process request */
         if ((pid = fork()) == -1) {
             printf("Error (tcp_server): Fork failed\n");
+            exit(1);
         }
         else if (pid == 0) { /* Child Process */
             close(fd);
@@ -325,7 +322,6 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
                 }
                 input_message.push_back(byte[0]);
             }
-            printf("tcp_server: The message is %s", input_message.c_str());
             struct request *req = process_input(&(input_message.front()));
             if (req == NULL) {
                 printf("Error (tcp_server): Couldn't allocate memory to process request\n");
@@ -379,10 +375,6 @@ int send_message(int fd, const char* message, size_t buf_size, struct sockaddr_i
     Parses information stored in buffer onto a struct request and returns
     a pointer to that struct */
 struct request* process_input(char buffer[]) {
-    printf("\nprocess_input: Starting function\n");
-
-    printf("process_input: Allocating memory for request structure\n");
-    printf("process_input: O request foi = %s", buffer);
     struct request *req = (struct request *) malloc(sizeof(struct request));
     
     /* Check if memory for the request was correctly allocated */
@@ -392,7 +384,6 @@ struct request* process_input(char buffer[]) {
     }
 
     /* Initialize struct */
-    printf("process_input: Initializing struct req memory\n");
     req->error = FALSE;
     memset(&(req->op_code), 0, sizeof(req->op_code));
     memset(&(req->letter_word), 0, sizeof(req->letter_word));
@@ -404,7 +395,6 @@ struct request* process_input(char buffer[]) {
 
     int i = 0;
     /* Retrieve op code defining the requested functionality from the server */
-    printf("process_input: Starting OP CODE loop\n");
     while (buffer[i] != ' ' && i < BLOCK_SIZE && buffer[i] != '\n') {
 
         (req->op_code).push_back(buffer[i]);
@@ -420,7 +410,6 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
-    printf("process_input: O OP_CODE = %s\n", req->op_code.c_str());
     if (req->op_code == GSB) {
         /* Nothing more to parse */
         req->letter_word = "NULL"; req->trial = "NULL"; req->PLID = "NULL";
@@ -429,7 +418,6 @@ struct request* process_input(char buffer[]) {
     i++;
 
     /* Retrieve the player ID */
-    printf("process_input: Starting PLID loop\n");
     while ((buffer[i] != ' ' && buffer[i] != '\0' && buffer[i] != '\n')  && i < BLOCK_SIZE) {
         //printf("\ni = %d , buffer[i] = %c\n", i, buffer[i]);
 
@@ -442,7 +430,6 @@ struct request* process_input(char buffer[]) {
             return req;
         }
     }
-    printf("process_input: PLID = %s\n", req->PLID.c_str());
     i++;
 
     if (valid_PLID(req->PLID) == -1) {
@@ -451,11 +438,9 @@ struct request* process_input(char buffer[]) {
                     // TODO maybe use req->error instead of valid_plid in other parts of code
     }
 
-    printf("process_input: Checking op code to see if we should continue\n");
     if (req->op_code == QUT || req->op_code == REV || req->op_code == SNG || req->op_code == GSB ||
         req->op_code == STA || req->op_code == GHL) {
         /* Nothing more to parse */
-        printf("process_input: No need to continue\n");
         req->letter_word = "NULL"; req->trial = "NULL";
         return req;
     }
@@ -551,6 +536,7 @@ std::string get_random_line_from_file() {
     char *buffer = (char *) malloc(WORD_LINE_SIZE * sizeof(char));
     if (buffer == NULL) {
         printf("Error (get_random_line_from_file): Ran out of memory\n");
+        exit(1);
     }
 
     size_t buf_size = WORD_LINE_SIZE;
@@ -606,7 +592,7 @@ int treat_request(int fd, struct sockaddr_in addr, socklen_t addrlen, struct req
     }
     else {
         /* Invalid protocol message */
-        std::string message = ERR + '\n'; // TODO see if other parts of req are invalid (Acho que já está feio ?)
+        std::string message = ERR + '\n';
         send_message(fd, message.c_str(), message.length(), addr, addrlen);
     }
 
@@ -638,16 +624,15 @@ void treat_tcp_request(int fd, struct request *req) {
         /* Scoreboard */
         treat_scoreboard(req, fd);
     }
-    else {
-        /* Invalid protocol message */
-        std::string message = ERR + '\n'; // TODO see if other parts of req are invalid (Acho que já está feio ?)
-        // send_message(fd, message.c_str(), message.length(), addr, addrlen);
-    }
+    // else {
+    //     /* Invalid protocol message */
+    //     std::string message = ERR + '\n';
+    //     send_message(fd, message.c_str(), message.length(), addr, addrlen);
+    // }
 }
 
 std::string create_scoreboard() {
     // iterate through all the files in the SCORES folder, and store the file_name in a vector
-    std::cerr << "create_scoreboard: Starting function\n";
     std::vector<std::string> scoreboard;
 
     DIR *dir;
@@ -737,7 +722,7 @@ std::string create_scoreboard() {
     }
     
 
-    std::cout << "create_scoreboard: scoreboard = " << scoreboard_string << std::endl;
+    // std::cout << "create_scoreboard: scoreboard = " << scoreboard_string << std::endl;
     return scoreboard_string;
     
 }
@@ -766,16 +751,9 @@ void treat_scoreboard(struct request *req, int fd) {
         message = "RSB OK " + file_name + file_length + message + '\n';
     }
 
-    std::cout << "treat_scoreboard: message = " << message << std::endl;
+    // std::cout << "treat_scoreboard: message = " << message << std::endl;
 
     tcp_write(fd, message);
-    // ssize_t n = write(fd, message.c_str(), message.length());
-    // if (n == -1) {
-        
-    //     /*freeaddrinfo(res);
-    //     close(fd);*/
-    //     exit(1);
-    // }
 
     return;
 }
@@ -786,7 +764,7 @@ void treat_state(struct request *req, int fd) {
     std::string status; 
     std::string message = RST;
     int found = check_for_active_game(req);
-    char game_path[FINISHEd_GAME_PATH_SIZE]; // TODO check this constant
+    char game_path[FINISHEd_GAME_PATH_SIZE];
     memset(game_path, '\0', FINISHEd_GAME_PATH_SIZE);
     if (found == -1) {
         /* No active game */
@@ -862,13 +840,13 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
         return 0;
     }
 
-    /* Exctract word and hint from game file */ // TODO esta parte ainda só funciona se for um active game file
+    /* Exctract word and hint from game file */
     char *word_and_hint = get_word_and_hint(fname);
     std::string word = get_word(word_and_hint);
     std::string hint = get_hint(word_and_hint);
 
     /* Read */
-    char *line = (char *) malloc(BLOCK_SIZE * sizeof(char)); // TODO isto está feito à bruta. o malloc está big boy
+    char *line = (char *) malloc(BLOCK_SIZE * sizeof(char));
     // size_t line_num = 1;
     size_t buf_size = BLOCK_SIZE;
     std::vector<std::string> trials; /* Vector with all trial lines to be appended to file */
@@ -903,8 +881,6 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
     fclose(state_file);
     free(word_and_hint);
 
-    // TODO se for um jogo ativo, ir buscar word knowledge
-
     return n;
 }
 
@@ -914,7 +890,7 @@ size_t create_temporary_state_file(struct request *req, int game_found, const ch
 size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::string word,
         std::string hint, struct request *req, int game_found, const char *file_name) {
 
-    size_t n = 0; // TODO caguei nos error checks nesta função por agora
+    size_t n = 0;
 
     /* Write last game/game found for PLID */
     std::string line;
@@ -940,17 +916,6 @@ size_t write_to_temp_file(FILE *file, std::vector<std::string> trials, std::stri
     for (auto line_it: trials) {
         n = n + fwrite(line_it.c_str(), sizeof(char), line_it.length(), file);
     }
-
-    // /* Write WIN/QUIT/ETC (if not an active game) */
-    // if (game_found == -1) {
-    //     line = TERMINATION + file_name[15]; // index 15 of a finished game is always the termination code
-    //     line.push_back('\n');
-    // }
-    // else {
-    //     line = CURRENTLY_SOLVED + get_word_knowledge(req) + "\n";
-    //     printf("Write_to_temp_file: Writing current knowledge of word\n%s", line.c_str());
-    // }
-    // n = n + fwrite(line.c_str(), sizeof(char), line.length(), file);
 
     return n;
 }
@@ -978,11 +943,9 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
             send_message(fd, get_last_reply(req).c_str(), get_last_reply(req).length(), addr, addrlen);
             return;
         }
-        printf("MATEUS MATEUS MATEUS MATEUS MATEUS MATEUS MATEUS\n");
         status = OK;
         std::string line = get_random_line_from_file();
         std::string word = get_word(line);
-        printf("word = %s\n", word.c_str());
         std::string hint = get_hint(line);
         suffix = suffix + std::to_string(word.length());
         std::string moves = max_tries(word);
@@ -1000,7 +963,6 @@ void treat_start(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     message = message + "\n";
     set_last_reply(req, message);
 
-    printf("treat_start: The message being sent is\n%s", message.c_str());
     send_message(fd, message.c_str(), message.length(), addr, addrlen);
 }
 
@@ -1031,7 +993,7 @@ std::string max_tries(std::string word) {
     The first line on an active game file is of the type
     <word> <hint_file>
      */
-std::string get_first_line_from_game_file(struct request *req) { // TODO check if this function is being used
+std::string get_first_line_from_game_file(struct request *req) {
 
     FILE *fp;
 
@@ -1039,6 +1001,7 @@ std::string get_first_line_from_game_file(struct request *req) { // TODO check i
     char* fname = (char *) malloc(GAME_NAME * sizeof(char));
     if (fname == NULL) {
         printf("Error (get_first_line_from_game_file): Ran out of memory\n");
+        exit(1);
     }
 
     /* Store path to file on fname */
@@ -1048,6 +1011,7 @@ std::string get_first_line_from_game_file(struct request *req) { // TODO check i
     char *buffer = (char *) malloc(WORD_LINE_SIZE * sizeof(char));
     if (buffer == NULL) {
         printf("Error (get_first_line_from_game_file): Ran out of memory\n");
+        exit(1);
     }
     size_t buf_size = WORD_LINE_SIZE;
 
@@ -1061,7 +1025,7 @@ std::string get_first_line_from_game_file(struct request *req) { // TODO check i
     // free(buffer);
     // free(fname);
 
-    return buffer; // TODO dar free algures
+    return buffer;
 }
 
 /* Get Word:
@@ -1120,7 +1084,6 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     /* Look for active games with req->PLID */
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
         /* Send error message */
-        printf("Reporting error???\n");
         report_error(fd, addr, addrlen, req);
         return;
     }
@@ -1131,10 +1094,7 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
         // TODO if duplicate guess, also reply INV
-        printf("treat_guess: req->trial = %s , move_number = %s\n", (req->trial).c_str(), move_number.c_str());
-        printf("treat_guess: Going to send INV\n");
         message = message + INV + moves;
-        printf("Treat_guess: Sending the following\n%s", message.c_str());
         send_message(fd, message.c_str(), message.length(), addr, addrlen);
         return;
     }
@@ -1168,7 +1128,6 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     }
 
     /* Send reply to client */
-    printf("treat_guess: Sending reply\n%s\n", message.c_str());
     send_message(fd, message.c_str(), message.length(), addr, addrlen);
 
 }
@@ -1202,42 +1161,6 @@ int FindLastGame(char *PLID, char *fname) {
     return (found);
 }
 
-
-/*int FindTopScores(SCORELIST ∗list) {
-    struct dirent **filelist;
-    int nentries, ifile;
-    char fname[50];
-    FILE *fp;
-
-    nentries = scandir("SCORES/", &filelist, 0, alphasort);
-    ifile = 0;
-    if (nentries < 0) {
-        return (0);
-    }
-    else {
-        while (nentries--) {
-            if (filelist[nentries]->d_name[0] != ".") {
-                sprintf(fname, "SCORES/%s", filelist[nentries]->d_name);
-                fp = fopen(fname, "r");
-                if (fp != NULL) {
-                    fscanf(fp, "%d %s %s %d %d" ,
-                    &list->score[ifile], list->PLID[ifile], list->word[ifile], &list->nsucc[ifile],
-                    &list->ntot[ifile]);
-
-                    fclose(fp);
-                    ++ifile;
-                }
-            }
-            free(filelist[nentries]);
-            if (ifile == 10) {
-                break;
-            }
-        }
-        free(filelist);
-    }
-    list->nscores = ifile;
-    return (ifile);
-}*/
 
 /* Create Active Game File: 
     Receives the first line "game" for a new game file and a pointer to a struct request 
@@ -1324,6 +1247,7 @@ void record_move_for_active_game(struct request *req) {
     /* Check for errors */
     if (file.fail()) {
         printf("Error (record_move_for_active_game): Failed to open game file.\n");
+        exit(1);
     }
 
     /* Append new line */
@@ -1481,7 +1405,7 @@ char* get_word_and_hint(std::string file_path) {
     size_t buf_size = LINE_SIZE;
     getline(&line, &buf_size, file);
 
-    return line; // TODO lembrar de dar free algures
+    return line;
 }
 
 /* Move to Scores:
@@ -1507,7 +1431,7 @@ void move_to_SCORES(struct request *req, char code) {
 
     /* Check if a directory exists for req->PLID's completed games, otherwise
         create it */
-    std::string completed_games = GAMES_DIR + req->PLID; // TODO acabar
+    std::string completed_games = GAMES_DIR + req->PLID;
     DIR *directory = opendir(completed_games.c_str());
 
     if (directory == NULL) {
@@ -1572,7 +1496,6 @@ void treat_quit(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     std::string status;
     if (valid_PLID(req->PLID) == -1 || req->error == TRUE) {
         /* No active game or invalid PLID */
-        // move_to_SCORES(req, Q);
         status = ERR;
     }
     else if (check_for_active_game(req) == -1) {
@@ -1642,21 +1565,17 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
         /* Send error message */
         report_error(fd, addr, addrlen, req);
-
         return;
     }
 
     /* Compare number of moves to req->trials */
     std::string move_number = get_game_trials(req);
     std::string moves = " " + move_number + "\n";
-    printf("O req->trial = %s e o move_number = %s\n", (req->trial).c_str(), move_number.c_str());
     if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
         message = message + INV + moves;
         send_message(fd, message.c_str(), message.length(), addr, addrlen);
         return;
-
-        // TODO analisar se aqui é para registar no ficheiro / incrementar erros
     }
     if (check_for_duplicate_move(req) == 0) {
         /* If this move had already been played */
@@ -1676,7 +1595,6 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
     /* Write to play to file */
     record_move_for_active_game(req);
 
-    // TODO falta o DUP!!!!
 
     if (!(positions((req->letter_word).front(), word).empty())) { // Some positions were found
         /* Prepare reply for client and update game file */
@@ -1687,8 +1605,6 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
             increment_game_trials(req);
             message = message + WIN + moves + "\n";
             move_to_SCORES(req, W);
-
-            // TODO falta mudar para completed GAMES subdir
         }
         else {
             /* Simply guessed a correct letter*/
@@ -1709,10 +1625,9 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
             message = message + NOK + moves + "\n";
         }
     }
-    printf("treat_play: The message being sent is\n%s\n", message.c_str());
     send_message(fd, message.c_str(), message.length(), addr, addrlen);
-
 }
+
 
 /* Positions:
     Returns a string with the number of occurences of "letter" in "word",
@@ -1754,6 +1669,7 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     struct game *new_game = (struct game *) malloc(sizeof(struct game));
     if (new_game == NULL) {
         printf("Error (create_game_session): Ran out of memory\n");
+        exit(1);
     }
 
     /* Initialize game struct to stop Valgrind's cries of despair */
@@ -1784,8 +1700,9 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     }
     
     /* Add it to active games hashmap */
-    active_games.insert({PLID, new_game}); // TODO lembrar de dar pop quando o jogo acaba
+    active_games.insert({PLID, new_game});
 }
+
 
 /* Update Game:
     Updates a player's corresponding active game struct */
@@ -1818,6 +1735,7 @@ void increment_game_error(struct request *req) {
     g->errors++;
 }
 
+
 /* Get Game Errors 
 
     Getter function for the "errors" attribute of the struct game indexed by
@@ -1828,6 +1746,7 @@ std::string get_game_errors(struct request *req) {
 
     return std::to_string(g->errors);
 }
+
 
 /* Get Game Trials 
 
@@ -1893,6 +1812,7 @@ int won_game(struct request *req) {
     return g->word == g->word_knowledge;
 }
 
+
 /* Report Error:
     Sends an error message to the client
 
@@ -1936,6 +1856,7 @@ int file_exists(std::string name) {
     }   
 }
 
+
 /* Treat Hint:
     
     If there is no active game for req->PLID or there is something wrong with
@@ -1947,51 +1868,37 @@ int file_exists(std::string name) {
 void treat_hint(struct request *req, int fd) {
     std::string message = RHL;
     message.push_back(' ');
-    printf("treat_hint: Starting function. The message is currently\n%s\n", message.c_str());
 
     /* Look for active games with req->PLID */
     if (valid_PLID(req->PLID) == -1 || check_for_active_game(req) == -1) {
         /* Send NOK message */
         
         message = message + NOK + "\n";
-        // printf("treat_hint: Sending message: %s", message.c_str());
         tcp_write(fd, message);
-        // ssize_t n = write(fd, message.c_str(), message.length());
-        // if (n == -1) {
-        //     exit(1);
-        // }
         return;
     }
     message = message + OK + " ";
-    printf("treat_hint: Game found. The message is currently\n%s\n", message.c_str());
 
     /* Get name of hint file */
     std::string game_path = ACTIVE_GAME_PATH + req->PLID + TXT;
     // std::string line = get_word_and_hint(game_path);
     char *line = get_word_and_hint(game_path);
     std::string hint = get_hint(line);
-    printf("treat_hint: The hint is\n%s\n", hint.c_str());
 
     message = message + hint + " ";
-    printf("treat_hint: The message is now\n%s\n", message.c_str());
 
     /* Open hint file */
     std::string hint_path = PICTURES + hint;
-    printf("treat_hint: Opening file (read binary) with path\n%s\n", hint_path.c_str());
     FILE *file = fopen(hint_path.c_str(), "rb");
 
     /* Get file size */
     fseek(file, 0, SEEK_END); // Place offset at the end of file
     ssize_t size = ftell(file); // Get offset value
     fseek(file, 0, SEEK_SET); // Set offset back to the start of file
-    printf("treat_hint: File size is %ld bytes\n", size);
 
     message = message + std::to_string(size) + " ";
-    printf("treat_hint: The message is now\n%s\n", message.c_str());
-    // fclose(file);
     
     /* Read file content */
-    // std::ifstream hint_file(hint_path);
     std::string content(READ_SIZE, '\0');
     size_t bytes_read = 0;
     size_t i = 0;
@@ -2009,25 +1916,14 @@ void treat_hint(struct request *req, int fd) {
         message = message + last_content;
     }
 
-    // printf("treat_hint: Reading file's content\n");
-    // while (getline (hint_file, content)) {
-    //     printf("Iteração Iteração");
-    //     content.push_back('\n');
-    //     message = message + content;
-    // }
-    // hint_file.close();
     fclose(file);
 
     message = message + "\n";
-    printf("treat_hint: Message being sent is\n%s", message.c_str());
     /* Send reply */
     tcp_write(fd, message);
-    // ssize_t n = write(fd, message.c_str(), message.length());
-    // if (n == -1) {
-    //     exit(1);
-    // }
     free(line);
 }
+
 
 /* Increment game success 
 
@@ -2051,6 +1947,7 @@ std::string compute_score(struct request *req) {
     return std::to_string(score);
 }
 
+
 void create_directories() {
     std::string games = GAMES_DIR;
     if (is_directory(GAMES_DIR) == -1) {
@@ -2068,12 +1965,12 @@ void create_directories() {
     }
 }
 
+
 void tcp_write(int fd, std::string message) {
     ssize_t bytes = message.length();
     ssize_t n;
     const char *ptr = message.c_str();
 
-    printf("tcp_write: We want to send message = %s", ptr);
     while (bytes > 0) {
         n = write(fd, ptr, message.length());
         if (n <= 0) {
@@ -2082,9 +1979,9 @@ void tcp_write(int fd, std::string message) {
         }
         bytes = bytes - n;
         ptr = ptr + n;
-        printf("tcp_write: This time wrote %ld bytes and we still need to write %ld bytes\n", n, bytes);
     }
 }
+
 
 /* Set last reply
 
@@ -2096,6 +1993,7 @@ void set_last_reply(struct request *req, std::string message) {
     g->last_reply = message;
 }
 
+
 /* Set last request
 
     Sets assigns message to game->last_request */
@@ -2106,6 +2004,7 @@ void set_last_request(struct request *req, std::string message) {
     g->last_request = message;
 }
 
+
 /* Get last reply */
 std::string get_last_reply(struct request *req) {
     auto it = active_games.find(req->PLID); // Gets iterator pointing to game
@@ -2113,6 +2012,7 @@ std::string get_last_reply(struct request *req) {
 
     return g->last_reply;
 }
+
 
 /* Get last request */
 std::string get_last_request(struct request *req) {
