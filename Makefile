@@ -1,11 +1,14 @@
 CXX ?= g++
 CXXFLAGS ?= -Wall -Wextra -Wcast-align -Wconversion -Wfloat-equal -Wformat=2 -Wnull-dereference -Wshadow -Wsign-conversion -Wswitch-default -Wswitch-enum -Wundef -Wunreachable-code -Wunused -g #-fsanitize=address -fsanitize=undefined
 
-hangman_client.out: hangman_server.cpp
-	$(CXX) $(CXXFLAGS) -o hangman_client.out hangman_client.cpp
+all: server client
 
-hangman_server.cpp:
-	$(CXX) $(CXXFLAGS) -o GS hangman-server.cpp
+client:
+	$(CXX) $(CXXFLAGS) -o player hangman_client.cpp
+
+server:
+	$(CXX) $(CXXFLAGS) -o GS hangman_server.cpp
 	
 clean:
-	rm *.out
+	rm GS
+	rm player
