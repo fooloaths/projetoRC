@@ -406,7 +406,7 @@ void start_new_game(std::string id, int fd, struct addrinfo *res, struct sockadd
     }
     catch (std::exception &e)
     {
-        std::cout << "Error: Invalid message. You have commited a Gonçalo Nunes error.\n";
+        std::cout << "Error: Invalid message. You have commited an error.\n";
         exit(1);
     }
     for (int i = 0; i < n_letters_int; i++)
@@ -424,7 +424,7 @@ std::string get_status(std::string message)
 
     if (message.length() < 4)
     {
-        printf("Error: Invalid message. You have commited a Gonçalo Nunes error.\n");
+        printf("Error: Invalid message. You have commited an error.\n");
         exit(1);
     }
 
@@ -508,8 +508,7 @@ std::string play_aux_ok(std::string word_pos, std::string letter)
                 }
                 catch (std::exception &e)
                 {
-                    std::cout << "Error: Invalid message. You have commited a Gonçalo Nunes error.\n";
-                    exit(1);
+                    std::cout << "Error: Invalid message. You have commited an error.\n";
                 }
                 word_pos_int_str.clear();
             }
@@ -524,7 +523,7 @@ std::string play_aux_ok(std::string word_pos, std::string letter)
         }
         catch (std::exception &e)
         {
-            std::cout << "Error: Invalid message. You have commited a Gonçalo Nunes error.\n";
+            std::cout << "Error: Invalid message. You have commited an error.\n";
             exit(1);
         }
 
