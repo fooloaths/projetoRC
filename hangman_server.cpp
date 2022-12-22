@@ -175,12 +175,21 @@ int main(int argc, char **argv) {
     }
 
     
+    
 
     // clone while sharing cout and cerr
     int pid = fork();
     if (pid != 0) { /* Parent process */
         /* UDP server */
           fd = socket(AF_INET, SOCK_DGRAM, 0); //UDP socket
+
+        // Implement timeout using select
+        struct timeval tv;
+        tv.tv_sec = SOCKET_TIMEOUT;
+        tv.tv_usec = 0;
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
+
           if (fd == -1) {
               printf("Error (main): An error occured while attempting to create an UDP socket\n");
               exit(1);
@@ -203,6 +212,13 @@ int main(int argc, char **argv) {
     else {
         /* TCP server */
         fd = socket(AF_INET, SOCK_STREAM, 0); //TCP socket
+
+        // Implement timeout using select
+        struct timeval tv;
+        tv.tv_sec = SOCKET_TIMEOUT; 
+        tv.tv_usec = 0;
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
         if (fd == -1) {
             printf("Error (main): An error occured while attempting to create an TCP socket\n");
             exit(1);
