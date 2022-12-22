@@ -1909,13 +1909,11 @@ void treat_hint(struct request *req, int fd) {
     size_t bytes_read = 0;
     size_t i = 0;
     while (size > READ_SIZE) {
-        printf("Iteração %ld\n", i);
         bytes_read = fread(&content.front(), sizeof(char), READ_SIZE, file); // read READ_SIZE bytes to our buffer
         message = message + content;
         size = size - bytes_read;
         i++;
     }
-    printf("Sobraram size = %ld", size);
     if (size > 0) {
         std::string last_content(size, '\0');
         fread(&last_content.front(), sizeof(char), size, file);
