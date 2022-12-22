@@ -1093,6 +1093,11 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
         report_error(fd, addr, addrlen, req);
         return;
     }
+    if (req->full_request == get_last_request(req)) {
+        /* If client repeated last message, the server reply
+         was probably lost before reaching the client */
+        send_message(fd, get_last_reply(req).c_str(), get_last_reply(req).length(), addr, addrlen);
+    }
 
     /* Compare number of moves to req->trials */
     std::string move_number = get_game_trials(req);
@@ -1573,6 +1578,11 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
         report_error(fd, addr, addrlen, req);
         return;
     }
+    if (req->full_request == get_last_request(req)) {
+        /* If client repeated last message, the server reply
+         was probably lost before reaching the client */
+        send_message(fd, get_last_reply(req).c_str(), get_last_reply(req).length(), addr, addrlen);
+    }
 
     /* Compare number of moves to req->trials */
     std::string move_number = get_game_trials(req);
@@ -1608,7 +1618,7 @@ void treat_play(int fd, struct sockaddr_in addr, socklen_t addrlen, struct reque
         increment_game_success(req);
         if (won_game(req)) {
             /* Won the game */
-            increment_game_trials(req);
+            // increment_game_trials(req);
             message = message + WIN + moves + "\n";
             move_to_SCORES(req, W);
         }
@@ -1695,7 +1705,7 @@ void create_game_session(std::string word, char moves, std::string PLID, std::st
     new_game->max_errors = moves;
     new_game->n_succs = 0;
     new_game->errors = 0;
-    new_game->int_move_number = 1;
+    new_game->int_move_number = 0;
     new_game->move_number = "1";
     new_game->hint_file = hint;
     new_game->last_request = req->full_request;
@@ -1864,12 +1874,12 @@ int file_exists(std::string name) {
 
 
 /* Treat Hint:
-    
+
     If there is no active game for req->PLID or there is something wrong with
     the request, replies RHL NOK
-    
+
     Otherwise, sends the contents of the hint file, with the the reply message
-    formatted as 
+    formatted as
     RHL status [Fname Fsize Fdata]*/
 void treat_hint(struct request *req, int fd) {
     std::string message = RHL;
@@ -1919,7 +1929,6 @@ void treat_hint(struct request *req, int fd) {
         fread(&last_content.front(), sizeof(char), size, file);
         message = message + last_content;
     }
-
     fclose(file);
 
     message = message + "\n";
@@ -1946,7 +1955,11 @@ std::string compute_score(struct request *req) {
     struct game *g = it->second;
 
     /* Update move number */
+    printf("Compute_score: n_succs = %d\n", g->n_succs);
+    printf("Compute_score: n_succs * 100 = %d\n", g->n_succs * 100);
+    printf("Compute_score: int_move_number = %d\n", g->int_move_number);
     int score = (float) (g->n_succs * 100 / g->int_move_number);
+    printf("Compute_score: score = %d\n", score);
 
     return std::to_string(score);
 }
