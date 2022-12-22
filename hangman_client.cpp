@@ -28,6 +28,9 @@ Mateus Pinho - ist199282
 #include <tuple>
 #include <fstream>
 
+/* Definitions */
+#define SOCKET_TIMEOUT 20 // seconds
+
 /* Global variables */
 int move_number = 0;
 std::string player_id = "";
@@ -117,8 +120,8 @@ int main(int argc, char *argv[]) {
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
 
-    std::ofstream file("/dev/null");
-    std::cerr.rdbuf(file.rdbuf());
+    // ! Uncomment this to disable stderr output
+    // // std::cerr.rdbuf(nullptr);
 
     // check if the number of arguments is correct
     auto ip_port_tuple = parse_args(argc, argv);
@@ -135,7 +138,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-
     // set the server's address
     if (memset(&hints, 0, sizeof(hints)) == NULL) {
         std::cout << "Error memset: " << strerror(errno) << std::endl;
@@ -164,7 +166,7 @@ int main(int argc, char *argv[]) {
 
         // poll for timeout UDP (must review) 
         struct timeval tv;
-        tv.tv_sec = 45;
+        tv.tv_sec = SOCKET_TIMEOUT;
         tv.tv_usec = 0;
         if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
             std::cout << "Error " << strerror(errno) << std::endl;
@@ -623,7 +625,7 @@ std::string tcp_helper(std::string message, const char* server_ip, const char* s
     }
 
     struct timeval tv;
-    tv.tv_sec = 45;
+    tv.tv_sec = SOCKET_TIMEOUT;
     tv.tv_usec = 0;
     if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv) == -1) {
         std::cout << "Error " << strerror(errno) << std::endl;
