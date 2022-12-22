@@ -37,17 +37,13 @@ Mateus Pinho - ist199282
 #include <sys/stat.h>
 #include <sys/types.h>
 
-// TODO don't add \n from hint to file
-// TODO check if ID is already in use
-// TODO if receive same play/guess twice, assume client didn't receive first reply and repeat the move (just don't store on the file)
-// TODO check for unused variables
 
 #define NUMBER_THREADS 16
 #define BLOCK_SIZE 256
 #define PORT "58046"
 #define GAME_NAME 15
 #define SEED 73
-#define NUMBER_OF_WORDS 26       // TODO algumas destas constantes foram tiradas do rabo
+#define NUMBER_OF_WORDS 26
 #define WORD_LINE_SIZE 25
 #define ARG_PORT "-p"
 
@@ -106,6 +102,7 @@ std::string create_scoreboard_file();
 void tcp_write(int fd, std::string message);
 void verbose_print(struct sockaddr_in addr, struct request *req);
 void parse_bootup_arguments(int argc, char **argv);
+int check_for_duplicate_move(struct request *req);
 
 struct request {
     std::string op_code;
@@ -150,18 +147,6 @@ int main(int argc, char **argv) {
     char buffer[BLOCK_SIZE];
     memset(buffer, '\0', BLOCK_SIZE);
 
-    // if (argc < 2) {
-    //     printf("Input Error (main): Expected, at least, 1 argument (word_file), but none was given.\n");
-    //     printf("\nTry running the program in the following format: %s <word_file> [-p GSport] [-v]\n\n", argv[0]);
-    //     return 1;
-    // }
-    // if (argc > 2) {
-    //     std::string arg_1 = argv[2];
-    //     std::string arg_2 = argv[3];
-    //     if (arg_1 == ARG_PORT) {
-    //         port = arg_2;
-    //     }
-    // }
     parse_bootup_arguments(argc, argv);
 
     word_file = argv[1];
@@ -1122,8 +1107,13 @@ void treat_guess(int fd, struct sockaddr_in addr, socklen_t addrlen, struct requ
     std::string moves = " " + move_number + "\n";
     if (req->trial != move_number) {
         /* Send message to client saying something went wrong */
-        // TODO if duplicate guess, also reply INV
         message = message + INV + moves;
+        send_message(fd, message.c_str(), message.length(), addr, addrlen);
+        return;
+    }
+    if (check_for_duplicate_move(req) == 0) {
+        /* If this move had already been played */
+        message = message + DUP + moves;
         send_message(fd, message.c_str(), message.length(), addr, addrlen);
         return;
     }
