@@ -746,13 +746,13 @@ void status_aux_ok(std::string status) {
     auto second_space = status.find(' ', status.find(' ') + 1) + 1;
     auto third_space = status.find(' ', second_space) + 1;
     auto length = third_space - second_space;
-    auto file_name = status.substr(second_space, length);
+    auto file_name = status.substr(second_space, length - 1);
     
     // status is after the fourth space
     auto fourth_space = status.find(' ', third_space) + 1;
     status = status.substr(fourth_space, status.length());
 
-    std::cout << "Status was saved to " << file_name << "with " << length << " bytes.\n";
+    std::cout << "Status was saved to " << file_name << " with " << length << " bytes.\n";
     std::cout << status;
     std::ofstream file(file_name);
     file << status;
