@@ -1,8 +1,0 @@
-ferromagnetism magnet.jpg
-T a
-T f
-T g
-T y
-T z
-G ferromagnetism
-2

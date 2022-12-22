@@ -1,8 +1,0 @@
-winning cup.jpeg
-T n
-T d
-T i
-T y
-T z
-G winning
-3

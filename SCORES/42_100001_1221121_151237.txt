@@ -1,8 +1,0 @@
-abracadabra witch.jpg
-T a
-T b
-T c
-T y
-T z
-G abracadabra
-2

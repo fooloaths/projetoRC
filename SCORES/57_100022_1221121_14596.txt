@@ -1,8 +1,0 @@
-vaccine SP_vac.jpg
-T c
-T d
-T v
-T z
-T i
-G vaccine
-2

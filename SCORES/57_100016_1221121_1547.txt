@@ -1,8 +1,0 @@
-platypus monotremata.jpg
-T p
-T l
-T a
-T f
-T z
-G platypus
-2

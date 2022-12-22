@@ -1,8 +1,0 @@
-goggomobil g_car.jpeg
-G abcdefghi
-G abcdefghij
-G abcdefghijk
-G abcdefghijkl
-G abcdefghijklmnopqrstuvwxyzabcd
-G goggomobil
-5

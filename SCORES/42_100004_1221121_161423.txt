@@ -1,8 +1,0 @@
-decarbonization PV_Panel.jpg
-T a
-T b
-T x
-T y
-T z
-G decarbonization
-2

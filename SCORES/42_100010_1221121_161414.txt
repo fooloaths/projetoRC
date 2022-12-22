@@ -1,8 +1,0 @@
-joker card.jpg
-T a
-T b
-T k
-T j
-T o
-G joker
-2

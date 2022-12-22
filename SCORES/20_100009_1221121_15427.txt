@@ -1,6 +1,0 @@
-island maldives.jpg
-G abcdefghijk
-G abcdefghijkl
-G abcdefghijklmnopqrstuvwxyzabcd
-G island
-3

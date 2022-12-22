@@ -1,8 +1,0 @@
-goggomobil g_car.jpeg
-T g
-T o
-T m
-T y
-T z
-G goggomobil
-2

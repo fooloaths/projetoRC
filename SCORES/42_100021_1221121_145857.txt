@@ -1,8 +1,0 @@
-usb connector.jpg
-T u
-T s
-T x
-T y
-T z
-G usb
-3
