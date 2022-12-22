@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MY_IP=$(curl -s http://ipecho.net/plain)
-TEJO="nc tejo 59000"
+TEJO="nc tejo.tecnico.ulisboa.pt 59000"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

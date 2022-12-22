@@ -59,6 +59,7 @@ TOPSCORES_*
 STATE_*
 *.png
 *.jpg
+*.jpeg
 *.bmp
 *.svg
 SCOREBOARD_*
