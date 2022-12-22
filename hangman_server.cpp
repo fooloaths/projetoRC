@@ -261,7 +261,8 @@ void udp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         n = recvfrom(fd,buffer, BLOCK_SIZE,0, (struct sockaddr*) &addr, &addrlen);
         if (n == -1) {
             printf("Error (udp_server): An error occured while trying to receive a message from the UDP socket\n");
-            exit(1);
+            printf("    One possibility is that there was a timeout due to lack of client interaction\n");
+            continue;
         }
 
         struct request *req = process_input(buffer);
@@ -321,7 +322,8 @@ void tcp_server(struct addrinfo hints, struct addrinfo *res, int fd, int errorco
         } while (newfd == -1 && errno == EINTR);
         if (newfd == -1) {
             printf("Error (tcp_server): An error occured while accepting a connection request\n"); 
-            exit(1);
+            printf("    One possibility is that there was a timeout due to lack of client interaction\n");
+            continue;
         }
 
         /* Fork a new process to process request */
