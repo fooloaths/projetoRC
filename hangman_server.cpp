@@ -1955,11 +1955,11 @@ std::string compute_score(struct request *req) {
     struct game *g = it->second;
 
     /* Update move number */
-    printf("Compute_score: n_succs = %d\n", g->n_succs);
-    printf("Compute_score: n_succs * 100 = %d\n", g->n_succs * 100);
-    printf("Compute_score: int_move_number = %d\n", g->int_move_number);
+    if (g->int_move_number == 0) {
+        /* No play was made */
+        return "0";
+    }
     int score = (float) (g->n_succs * 100 / g->int_move_number);
-    printf("Compute_score: score = %d\n", score);
 
     return std::to_string(score);
 }
